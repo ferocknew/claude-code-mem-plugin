@@ -21,6 +21,67 @@ const analysisQueue = [];
 let isProcessing = false;
 
 /**
+ * 读取 JSONL 文件内容
+ */
+function readMemoryFile(limit = 100) {
+  try {
+    if (!fs.existsSync(MEMORY_FILE)) {
+      return [];
+    }
+
+    const content = fs.readFileSync(MEMORY_FILE, 'utf8');
+    const lines = content.trim().split('\n').filter(line => line.trim());
+
+    // 只返回最近的 N 条
+    const recentLines = lines.slice(-limit);
+
+    return recentLines.map(line => {
+      try {
+        return JSON.parse(line);
+      } catch (error) {
+        console.error('[Worker] Error parsing line:', error.message);
+        return null;
+      }
+    }).filter(item => item !== null);
+  } catch (error) {
+    console.error('[Worker] Error reading memory file:', error.message);
+    return [];
+  }
+}
+
+/**
+ * 获取统计信息
+ */
+function getStats() {
+  try {
+    const records = readMemoryFile(1000); // 读取最近 1000 条
+
+    const stats = {
+      total_records: records.length,
+      by_type: {},
+      recent_sessions: 0,
+      recent_summaries: 0,
+      recent_observations: 0,
+    };
+
+    // 统计类型
+    records.forEach(record => {
+      const type = record.type || 'unknown';
+      stats.by_type[type] = (stats.by_type[type] || 0) + 1;
+    });
+
+    stats.recent_sessions = stats.by_type['session_event'] || 0;
+    stats.recent_summaries = stats.by_type['session_summary'] || 0;
+    stats.recent_observations = stats.by_type['observation'] || 0;
+
+    return stats;
+  } catch (error) {
+    console.error('[Worker] Error getting stats:', error.message);
+    return { error: error.message };
+  }
+}
+
+/**
  * 保存分析结果
  */
 function saveAnalysisResult(analysis, sessionData) {
@@ -126,7 +187,36 @@ const server = http.createServer((req, res) => {
       queueSize: analysisQueue.length,
       isProcessing,
       uptime: process.uptime(),
+      stats: getStats(), // 添加统计信息
     }));
+    return;
+  }
+
+  // 获取最近的记录
+  if (req.method === 'GET' && req.url.startsWith('/api/records')) {
+    const url = new URL(req.url, `http://${req.headers.host}`);
+    const limit = parseInt(url.searchParams.get('limit') || '100');
+    const type = url.searchParams.get('type');
+
+    let records = readMemoryFile(limit);
+
+    // 按类型过滤
+    if (type) {
+      records = records.filter(r => r.type === type);
+    }
+
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      total: records.length,
+      records: records,
+    }));
+    return;
+  }
+
+  // 获取统计信息
+  if (req.method === 'GET' && req.url === '/api/stats') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(getStats()));
     return;
   }
 
@@ -180,6 +270,9 @@ server.listen(PORT, HOST, () => {
   console.error(`[Worker] Claude Mem Worker started on http://${HOST}:${PORT}`);
   console.error(`[Worker] Health check: http://${HOST}:${PORT}/health`);
   console.error(`[Worker] Analysis API: http://${HOST}:${PORT}/api/analyze`);
+  console.error(`[Worker] Records API: http://${HOST}:${PORT}/api/records?limit=100`);
+  console.error(`[Worker] Stats API: http://${HOST}:${PORT}/api/stats`);
+  console.error(`[Worker] Memory file: ${MEMORY_FILE}`);
 });
 
 /**

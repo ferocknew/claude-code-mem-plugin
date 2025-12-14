@@ -8,7 +8,7 @@
             "type": "command",
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/start_worker.js\"",
             "timeout": 30,
-            "description": "Start Worker service"
+            "description": "Start Worker service (once per Claude Code launch)"
           },
           {
             "type": "command",
@@ -49,13 +49,7 @@
             "type": "command",
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/stop.js\"",
             "timeout": 10,
-            "description": "Record session end"
-          },
-          {
-            "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/stop_worker.js\"",
-            "timeout": 30,
-            "description": "Stop Worker service"
+            "description": "Record session end and submit to Worker"
           }
         ]
       }

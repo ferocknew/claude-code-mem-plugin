@@ -2,11 +2,13 @@
 /**
  * Worker 启动脚本
  * 由 Claude Code 启动时自动执行
+ * 使用 Worker API 检测是否已运行，避免重复启动
  */
 const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const http = require('http');
 
 const DATA_DIR = path.join(os.homedir(), '.claude-code-mem');
 const PID_FILE = path.join(DATA_DIR, 'worker.pid');
@@ -24,59 +26,88 @@ if (!fs.existsSync(DATA_DIR)) {
 }
 
 /**
- * 检查 Worker 是否已运行
+ * 检查 Worker 是否可用（通过 API）
  */
-function isWorkerRunning() {
-  if (!fs.existsSync(PID_FILE)) {
-    return false;
-  }
-
-  try {
-    const pid = parseInt(fs.readFileSync(PID_FILE, 'utf8'));
-    // 检查进程是否存在
-    process.kill(pid, 0);
-    return true;
-  } catch (error) {
-    // 进程不存在，清理 PID 文件
-    try {
-      fs.unlinkSync(PID_FILE);
-    } catch (e) {
-      // 忽略
-    }
-    return false;
-  }
-}
-
-/**
- * 检查端口是否可用
- */
-async function isPortAvailable() {
+async function isWorkerAvailable() {
   return new Promise((resolve) => {
-    const http = require('http');
+    const req = http.get(`http://${HOST}:${PORT}/health`, (res) => {
+      let data = '';
 
-    http.get(`http://${HOST}:${PORT}/health`, (res) => {
-      resolve(res.statusCode === 200);
-    }).on('error', () => {
+      res.on('data', (chunk) => {
+        data += chunk;
+      });
+
+      res.on('end', () => {
+        if (res.statusCode === 200) {
+          try {
+            const health = JSON.parse(data);
+            console.error('✅ Worker is running:', {
+              uptime: Math.floor(health.uptime) + 's',
+              queue: health.queueSize,
+              stats: health.stats,
+            });
+            resolve(true);
+          } catch (error) {
+            resolve(false);
+          }
+        } else {
+          resolve(false);
+        }
+      });
+    });
+
+    req.on('error', () => {
+      resolve(false);
+    });
+
+    req.setTimeout(1000, () => {
+      req.destroy();
       resolve(false);
     });
   });
 }
 
 /**
- * 启动 Worker
+ * 清理过期的 PID 文件
  */
-async function startWorker() {
-  // 检查是否已运行
-  if (isWorkerRunning()) {
-    console.error('✅ Worker already running');
+function cleanupPidFile() {
+  if (!fs.existsSync(PID_FILE)) {
     return;
   }
 
-  // 检查端口
-  if (await isPortAvailable()) {
-    console.error('✅ Worker already available at port', PORT);
+  try {
+    const pid = parseInt(fs.readFileSync(PID_FILE, 'utf8'));
+    // 尝试检查进程是否存在
+    try {
+      process.kill(pid, 0);
+      // 进程存在
+    } catch (error) {
+      // 进程不存在，清理 PID 文件
+      fs.unlinkSync(PID_FILE);
+      console.error('🧹 Cleaned up stale PID file');
+    }
+  } catch (error) {
+    // PID 文件损坏，删除
+    try {
+      fs.unlinkSync(PID_FILE);
+    } catch (e) {
+      // 忽略
+    }
+  }
+}
+
+/**
+ * 启动 Worker
+ */
+async function startWorker() {
+  // 首先检查 Worker 是否通过 API 响应
+  if (await isWorkerAvailable()) {
+    console.error('✅ Worker already running and healthy');
     return;
   }
+
+  // Worker 不可用，清理可能的过期 PID
+  cleanupPidFile();
 
   console.error('🚀 Starting Worker service...');
 
@@ -102,14 +133,18 @@ async function startWorker() {
   console.error(`📝 PID file: ${PID_FILE}`);
 
   // 等待 Worker 启动
-  await new Promise((resolve) => setTimeout(resolve, 1000));
+  console.error('⏳ Waiting for Worker to be ready...');
+  for (let i = 0; i < 10; i++) {
+    await new Promise((resolve) => setTimeout(resolve, 500));
 
-  // 验证启动成功
-  if (await isPortAvailable()) {
-    console.error('✅ Worker is healthy and ready');
-  } else {
-    console.error('⚠️  Worker may not be ready yet, check logs at', LOG_FILE);
+    if (await isWorkerAvailable()) {
+      console.error('✅ Worker is ready!');
+      return;
+    }
   }
+
+  console.error('⚠️  Worker may not be ready yet, but process has started');
+  console.error('   Check status: curl http://' + HOST + ':' + PORT + '/health');
 }
 
 // 执行启动
