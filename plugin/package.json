@@ -1,10 +1,15 @@
 {
   "name": "claude-code-mem",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Claude Code Memory Plugin - Local memory with hooks",
   "author": {
     "name": "ferocknew"
   },
   "license": "MIT",
-  "repository": "https://github.com/ferocknew/claude-code-mem-plugin"
+  "repository": "https://github.com/ferocknew/claude-code-mem-plugin",
+  "scripts": {
+    "postinstall": "echo '✅ Claude Code Memory Plugin installed successfully'"
+  },
+  "dependencies": {
+  }
 }

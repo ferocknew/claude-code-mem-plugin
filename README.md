@@ -1,264 +1,255 @@
 # Claude Code Memory Plugin
 
-基于 MCP (Model Context Protocol) 的 Claude Code 记忆插件，通过本地 JSONL 文件记录和管理对话内容。
-
-参考：[MCP 官方 memory server](https://github.com/modelcontextprotocol/servers/tree/main/src/memory)
+纯 JavaScript 的 Claude Code 记忆插件，通过 hooks 自动记录对话内容到本地 JSONL 文件。
 
 ---
 
 ## 🚀 快速安装
 
-### 方式一：从 PyPI 安装（公开发布后）
+### 方式一：从 GitHub 安装（推荐）
 
 ```bash
 # 在 Claude Code 中执行
-/plugin marketplace add ferocknew/claude-code-mem-plugin
-/plugin install claude-code-mem
+/plugin install https://github.com/ferocknew/claude-code-mem-plugin.git
 ```
 
-### 方式二：从私有 Nexus 安装（开发调试）
-
-```bash
-# 1. 配置环境变量
-export UVX_INDEX_URL=https://your-nexus-server/repository/pypi-group/simple
-
-# 2. 启动 Claude Code
-claude
-
-# 3. 安装插件
-/plugin install claude-code-mem
-```
-
-### 方式三：本地开发安装
+### 方式二：本地开发安装
 
 ```bash
 # 1. 克隆项目
-git clone https://github.com/<your-username>/claude-code-mem-plugin.git
-cd claude-code-mem-plugin
+git clone https://github.com/ferocknew/claude-code-mem-plugin.git
 
-# 2. 安装依赖
-uv sync
-
-# 3. 测试运行
-uv run python client/mcp_client.py
+# 2. 在 Claude Code 中安装
+/plugin install /path/to/claude-code-mem-plugin
 ```
 
 ---
 
 ## 📋 功能特性
 
-### MCP 工具（参考官方 memory server）
-
-| 工具 | 说明 |
-|------|------|
-| `create_entities` | 创建实体（知识节点） |
-| `create_relations` | 创建实体间关系 |
-| `add_observations` | 为实体添加观察记录 |
-| `delete_entities` | 删除实体 |
-| `delete_relations` | 删除关系 |
-| `delete_observations` | 删除观察记录 |
-| `read_graph` | 读取整个知识图谱 |
-| `search_nodes` | 搜索实体和观察 |
-| `open_nodes` | 获取指定实体详情 |
-
-### 数据存储
-
-- 📁 **本地存储**：`~/.claude-code-mem/mem.jsonl`
-- 📝 **JSONL 格式**：每行一个 JSON 对象
-- 🔍 **支持搜索**：全文搜索实体和观察内容
-- 💾 **持久化**：数据永久保存在本地
+- ✅ **自动记录会话** - 自动记录会话开始/结束
+- ✅ **记录用户输入** - 自动捕获用户的每次输入
+- ✅ **记录工具执行** - 自动记录工具调用和结果
+- ✅ **本地存储** - 数据保存在 `~/.claude-code-mem/mem.jsonl`
+- ✅ **JSONL 格式** - 每行一个 JSON 对象，易于处理
+- ✅ **跨平台** - 纯 JavaScript 实现，支持 Windows/Mac/Linux
+- ✅ **零依赖** - 只使用 Node.js 内置模块，无需额外安装
 
 ---
 
-## 💡 使用示例
+## 📂 数据存储
 
-### 创建知识实体
+### 存储位置
 
-```python
-# 创建一个技能实体
-await create_entities([{
-    "name": "Python开发",
-    "entityType": "skill",
-    "observations": ["熟悉FastMCP框架", "了解MCP协议"]
-}])
+```
+~/.claude-code-mem/mem.jsonl
 ```
 
-### 添加观察记录
+### 数据格式
 
-```python
-# 为实体添加新的观察
-await add_observations([{
-    "entityName": "Python开发",
-    "contents": ["今天完成了插件开发", "学习了知识图谱"]
-}])
+**会话事件:**
+```json
+{
+  "type": "session_event",
+  "event": "session_start",
+  "timestamp": "2024-12-14T15:30:00.000Z"
+}
 ```
 
-### 搜索记忆
-
-```python
-# 搜索包含关键词的内容
-await search_nodes("FastMCP")
+**用户消息:**
+```json
+{
+  "id": "uuid",
+  "type": "user_message",
+  "content": "用户输入的内容",
+  "timestamp": "2024-12-14T15:30:00.000Z"
+}
 ```
 
-### 读取知识图谱
-
-```python
-# 获取所有实体、关系和观察
-await read_graph()
+**工具执行:**
+```json
+{
+  "id": "uuid",
+  "type": "tool_execution",
+  "tool_name": "read_file",
+  "result": "工具执行结果（前500字符）",
+  "timestamp": "2024-12-14T15:30:00.000Z"
+}
 ```
 
 ---
 
-## 🔧 开发者指南
-
-### 发布到私有 Nexus
-
-```bash
-# 1. 配置 .env 文件
-cat > .env << EOF
-NEXUS_USERNAME=admin
-NEXUS_PASSWORD=your_password
-NEXUS_URL=https://your-nexus-server/
-UVX_INDEX_URL=https://your-nexus-server/repository/pypi-group/simple
-EOF
-
-# 2. 更新版本号
-echo "0.1.1" > VERSION
-
-# 3. 构建并发布
-./build_and_publish_uv.sh
-```
-
-### 项目结构
+## 🔧 项目结构
 
 ```
 claude-code-mem-plugin/
-├── client/              # 插件客户端（打包发布）
-│   ├── mcp_client.py   # MCP 服务器实现
-│   └── __init__.py
-├── .claude-plugin/      # 插件配置
-│   └── plugin.json     # 插件元数据
-├── server/             # 服务端（独立部署，可选）
-├── VERSION             # 版本号文件
-├── build_and_publish_uv.sh  # 发布脚本
-└── README.md
+├── plugin/                    # 插件主目录
+│   ├── .claude-plugin/       # 插件配置
+│   │   ├── plugin.json       # 插件元数据
+│   │   ├── marketplace.json  # 市场配置
+│   │   └── README.md         # 插件说明
+│   ├── hooks/                # Hook 脚本
+│   │   ├── hooks.json        # Hook 配置
+│   │   ├── session-start.js  # 会话开始
+│   │   ├── user-prompt.js    # 用户输入
+│   │   ├── post-tool.js      # 工具执行后
+│   │   └── stop.js           # 会话结束
+│   └── package.json          # 插件包信息
+├── update_version.sh          # 版本号同步脚本
+├── LICENSE
+├── README.md
+└── VERSION
 ```
 
-### 本地测试
+---
+
+## 💡 使用说明
+
+插件安装后会自动工作，无需额外配置。所有对话内容会自动记录到本地文件。
+
+### 查看记录
 
 ```bash
-# 测试插件
-uv run python client/mcp_client.py
+# 查看所有记录
+cat ~/.claude-code-mem/mem.jsonl
 
-# 查看数据文件
+# 使用 jq 格式化查看
 cat ~/.claude-code-mem/mem.jsonl | jq .
 
-# 查看文件大小
-ls -lh ~/.claude-code-mem/mem.jsonl
+# 查看最近10条记录
+tail -n 10 ~/.claude-code-mem/mem.jsonl | jq .
+
+# 查找特定内容
+grep "关键词" ~/.claude-code-mem/mem.jsonl | jq .
+
+# 统计记录数量
+wc -l ~/.claude-code-mem/mem.jsonl
 ```
 
----
-
-## 📊 数据格式
-
-### 实体（Entity）
-
-```json
-{
-  "id": "uuid",
-  "type": "entity",
-  "name": "Python开发",
-  "entityType": "skill",
-  "observations": ["熟悉FastMCP"],
-  "timestamp": "2024-12-14T..."
-}
-```
-
-### 关系（Relation）
-
-```json
-{
-  "id": "uuid",
-  "type": "relation",
-  "from": "entity1_id",
-  "to": "entity2_id",
-  "relationType": "relates_to",
-  "timestamp": "2024-12-14T..."
-}
-```
-
-### 观察（Observation）
-
-```json
-{
-  "id": "uuid",
-  "type": "observation",
-  "entityName": "Python开发",
-  "contents": ["今天学习了MCP"],
-  "timestamp": "2024-12-14T..."
-}
-```
-
----
-
-## ⚙️ 配置说明
-
-### 环境变量（开发调试）
-
-在 `~/.zshrc` 或 `~/.bashrc` 中配置：
+### 数据备份
 
 ```bash
-# 使用私有 Nexus
-export UVX_INDEX_URL=https://your-nexus-server/repository/pypi-group/simple
+# 备份数据
+cp ~/.claude-code-mem/mem.jsonl ~/.claude-code-mem/mem.backup.jsonl
+
+# 按日期备份
+cp ~/.claude-code-mem/mem.jsonl ~/.claude-code-mem/mem.$(date +%Y%m%d).jsonl
+
+# 清空数据（重新开始）
+rm ~/.claude-code-mem/mem.jsonl
 ```
 
-### 插件配置
+---
 
-`.claude-plugin/plugin.json` 会自动读取环境变量：
+## 🔧 开发指南
 
-```json
-{
-  "name": "claude-code-mem",
-  "version": "0.1.1",
-  "author": {
-    "name": "ferocknew"
-  },
-  "repository": "https://github.com/ferocknew/claude-code-mem-plugin"
-}
+### Hook 说明
+
+插件通过以下 hooks 捕获对话内容：
+
+| Hook | 触发时机 | 记录内容 |
+|------|---------|----------|
+| **SessionStart** | 会话开始时 | 会话启动事件 |
+| **UserPromptSubmit** | 用户提交输入时 | 用户输入内容 |
+| **PostToolUse** | 工具执行后 | 工具名称和结果 |
+| **Stop** | 会话结束时 | 会话结束事件 |
+
+### 自定义扩展
+
+可以编辑 `plugin/hooks/*.js` 文件来自定义记录逻辑：
+
+```javascript
+// 示例：添加自定义字段
+const record = {
+  id: randomUUID(),
+  type: 'user_message',
+  content: userInput,
+  timestamp: new Date().toISOString(),
+  custom_field: 'your_value'  // 自定义字段
+};
+```
+
+### 版本管理
+
+```bash
+# 1. 更新 VERSION 文件
+echo "0.2.0" > VERSION
+
+# 2. 同步版本号到所有配置文件
+./update_version.sh
+
+# 3. 提交更改
+git add -A
+git commit -m "chore: bump version to 0.2.0"
+git tag v0.2.0
+git push && git push --tags
 ```
 
 ---
 
 ## 🐛 故障排除
 
-### 插件无法安装
+### 数据未记录
 
 ```bash
-# 检查环境变量
-echo $UVX_INDEX_URL
-
-# 手动测试安装
-uvx --from claude-code-mem-plugin claude-mem-client
-```
-
-### 数据文件位置
-
-```bash
-# 查看数据目录
+# 检查目录是否存在
 ls -la ~/.claude-code-mem/
 
-# 查看文件内容
-cat ~/.claude-code-mem/mem.jsonl
+# 检查文件权限
+ls -l ~/.claude-code-mem/mem.jsonl
+
+# 手动创建目录
+mkdir -p ~/.claude-code-mem
+
+# 检查文件是否可写
+touch ~/.claude-code-mem/test.txt && rm ~/.claude-code-mem/test.txt
 ```
 
-### 清理数据
+### 插件未生效
 
 ```bash
-# 备份数据
-cp ~/.claude-code-mem/mem.jsonl ~/.claude-code-mem/mem.backup.jsonl
+# 在 Claude Code 中检查插件状态
+/plugin list
 
-# 清空数据
-rm ~/.claude-code-mem/mem.jsonl
+# 查看插件详情
+/plugin show claude-code-mem
+
+# 重新启用插件
+/plugin disable claude-code-mem
+/plugin enable claude-code-mem
+
+# 重启 Claude Code
+```
+
+### Hook 脚本错误
+
+```bash
+# 手动测试 hook 脚本
+cd plugin/hooks
+node session-start.js
+
+# 检查 Node.js 版本 (需要 18+)
+node --version
+```
+
+---
+
+## 📊 数据分析示例
+
+使用 `jq` 进行数据分析：
+
+```bash
+# 统计消息类型分布
+cat ~/.claude-code-mem/mem.jsonl | jq -r '.type' | sort | uniq -c
+
+# 查看今天的记录
+cat ~/.claude-code-mem/mem.jsonl | jq 'select(.timestamp | startswith("2024-12-14"))'
+
+# 统计工具使用次数
+cat ~/.claude-code-mem/mem.jsonl | jq -r 'select(.type=="tool_execution") | .tool_name' | sort | uniq -c
+
+# 导出为 JSON 数组
+cat ~/.claude-code-mem/mem.jsonl | jq -s '.' > export.json
 ```
 
 ---
@@ -269,6 +260,25 @@ MIT License - 查看 [LICENSE](LICENSE) 文件了解详情。
 
 ## 🔗 相关链接
 
-- [MCP 官方文档](https://modelcontextprotocol.io/)
-- [MCP 官方 memory server](https://github.com/modelcontextprotocol/servers/tree/main/src/memory)
-- [FastMCP 框架](https://github.com/jlowin/fastmcp)
+- [Claude Code 文档](https://docs.claude.ai/code)
+- [GitHub 仓库](https://github.com/ferocknew/claude-code-mem-plugin)
+- [Issues](https://github.com/ferocknew/claude-code-mem-plugin/issues)
+- [Discussions](https://github.com/ferocknew/claude-code-mem-plugin/discussions)
+
+---
+
+## 🤝 贡献
+
+欢迎提交 Issue 和 Pull Request！
+
+1. Fork 本项目
+2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送到分支 (`git push origin feature/AmazingFeature`)
+5. 开启 Pull Request
+
+---
+
+## ⭐ Star History
+
+如果这个项目对你有帮助，请给个 Star ⭐️

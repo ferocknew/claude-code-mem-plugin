@@ -10,7 +10,7 @@
   "plugins": [
     {
       "name": "claude-code-mem",
-      "version": "0.1.0",
+      "version": "0.1.7",
       "source": "./",
       "description": "基于 MCP (Model Context Protocol) 的 Claude Code 记忆插件，用于记录和管理系统对话内容"
     }
