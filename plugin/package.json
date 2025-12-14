@@ -1,6 +1,6 @@
 {
   "name": "claude-code-mem",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Claude Code Memory Plugin - Local memory with hooks",
   "author": {
     "name": "ferocknew"
