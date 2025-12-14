@@ -1,6 +1,9 @@
 {
   "name": "claude-memory-plugin-marketplace",
-  "owner": "ferocknew",
+  "owner": {
+    "name": "ferocknew",
+    "type": "user"
+  },
   "description": "基于 MCP 协议的 Claude Code 记忆插件市场",
   "version": "1.0.0",
   "plugins": [
@@ -15,11 +18,7 @@
       "repository": "https://github.com/ferocknew/claude-code-mem-plugin",
       "homepage": "https://github.com/ferocknew/claude-code-mem-plugin",
       "license": "MIT",
-      "keywords": ["memory", "mcp", "conversation", "history", "search"],
-      "source": {
-        "type": "git",
-        "url": "https://github.com/ferocknew/claude-code-mem-plugin"
-      }
+      "keywords": ["memory", "mcp", "conversation", "history", "search"]
     }
   ]
 }
