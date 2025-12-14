@@ -10,7 +10,9 @@
 
 ```bash
 # 在 Claude Code 中执行
-/plugin install https://github.com/ferocknew/claude-code-mem-plugin.git
+/plugin marketplace add ferocknew/claude-code-mem-plugin
+
+/plugin install claude-code-mem
 ```
 
 ### 方式二：本地开发安装
