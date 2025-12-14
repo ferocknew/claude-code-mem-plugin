@@ -1,6 +1,6 @@
 {
   "name": "claude-code-mem",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "基于 MCP (Model Context Protocol) 的 Claude Code 记忆插件，用于记录和管理系统对话内容",
   "author": {
     "name": "ferocknew"
