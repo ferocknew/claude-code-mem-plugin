@@ -12,7 +12,8 @@
       "Bash(claude plugin list:*)",
       "Bash(claude plugin)",
       "mcp__memory__search_nodes",
-      "mcp__memory__create_entities"
+      "mcp__memory__create_entities",
+      "mcp__memory__read_graph"
     ]
   }
 }

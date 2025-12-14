@@ -34,7 +34,7 @@ function debugLog(message, data = null) {
 }
 
 debugLog('Stop hook started', {
-  env_keys: Object.keys(process.env).filter(k => k.includes('CLAUDE')),
+  all_env_keys: Object.keys(process.env).filter(k => k.includes('CLAUDE') || k.includes('ASSISTANT') || k.includes('RESPONSE')),
   has_claude_response: !!process.env.CLAUDE_RESPONSE,
   session_file_exists: fs.existsSync(SESSION_FILE),
 });

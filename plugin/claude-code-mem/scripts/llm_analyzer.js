@@ -54,7 +54,7 @@ function getApiConfig() {
 }
 
 /**
- * 调用 Claude API（支持自定义 base URL）
+ * 调用 Claude API(支持自定义 base URL,包括智谱AI)
  */
 async function callClaudeAPI(prompt, config) {
   return new Promise((resolve, reject) => {
@@ -72,17 +72,29 @@ async function callClaudeAPI(prompt, config) {
     // 解析 base URL
     const url = new URL(config.baseUrl + '/v1/messages');
 
+    // 根据不同的 API 提供商设置不同的请求头
+    const headers = {
+      'Content-Type': 'application/json',
+      'Content-Length': Buffer.byteLength(data), // 使用 Buffer.byteLength 确保准确
+    };
+
+    // 智谱 AI 使用 Authorization header (遵循 Anthropic API 规范)
+    if (config.baseUrl.includes('bigmodel.cn')) {
+      headers['Authorization'] = `Bearer ${config.apiKey}`;
+    } else {
+      // Anthropic 官方 API 使用 x-api-key
+      headers['x-api-key'] = config.apiKey;
+      headers['anthropic-version'] = '2023-06-01';
+    }
+
     const options = {
       hostname: url.hostname,
       port: url.port || 443,
       path: url.pathname,
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Content-Length': data.length,
-        'x-api-key': config.apiKey,
-        'anthropic-version': '2023-06-01',
-      },
+      headers: headers,
+      // 对于智谱 AI,需要禁用严格的证书验证
+      rejectUnauthorized: !config.baseUrl.includes('bigmodel.cn'),
     };
 
     const req = https.request(options, (res) => {
@@ -169,11 +181,11 @@ async function generateSessionSummary(conversationText, config) {
 
 ${conversationText}
 
-请以 JSON 格式返回，包含以下字段:
+请以 JSON 格式返回，包含以下字段：
 
 1. **investigated** (🔍 调查内容): 用户询问或请求了什么？尝试解决什么问题？(2-3句话)
 2. **learned** (💡 学到什么): 从这次对话中获得的关键知识点或发现(2-3句话)
-3. **completed** (✅ 完成内容): 实际完成了什么？有哪些具体成果？(2-3句话)
+3. **completed** (✅ 完成内容): 实际完成了什么？有哪些具体成果？根据工具执行历史推测(2-3句话)
 4. **next_steps** (➡️ 后续步骤): 建议的后续行动或待办事项(可选，1-2句话)
 5. **observations** (数组): 技术观察列表，每个包含:
    - type: 观察类型(${OBSERVATION_TYPES.join(', ')})
@@ -181,6 +193,8 @@ ${conversationText}
    - insight: 关键洞察(1-2句话)
    - concepts: 相关概念(从 ${CONCEPT_TAGS.join(', ')} 中选择)
    - files: 相关文件(如果有)
+
+注意：如果没有助手响应，可以基于用户请求和工具执行历史来推测完成的工作。
 
 只返回 JSON 对象，不要其他文字。格式示例:
 {
@@ -224,7 +238,7 @@ ${conversationText}
 }
 
 /**
- * 分析会话 - 优化版：只分析用户输入和助手响应
+ * 分析会话 - 优化版：基于用户输入和工具执行历史
  */
 async function analyzeSession(sessionData) {
   const config = getApiConfig();
@@ -234,40 +248,53 @@ async function analyzeSession(sessionData) {
 
   console.error(`🔄 Using ${config.source} auth with model: ${config.model}`);
 
-  // 只提取用户消息和助手响应（跳过工具执行细节）
+  // 提取用户消息、助手响应和工具执行
   const userMessages = [];
   const assistantMessages = [];
+  const toolExecutions = [];
 
   for (const record of sessionData) {
     if (record.type === 'user_message') {
       userMessages.push(record.content);
     } else if (record.type === 'assistant_message') {
       assistantMessages.push(record.content);
+    } else if (record.type === 'tool_execution') {
+      toolExecutions.push(record.tool_name);
     }
   }
 
   // 检查是否有足够的对话内容
-  if (userMessages.length === 0 || assistantMessages.length === 0) {
-    console.error('⚠️  Insufficient conversation content to analyze');
+  if (userMessages.length === 0) {
+    console.error('⚠️  No user messages to analyze');
     return null;
   }
 
-  // 构建对话文本 - 只包含用户输入和助手的关键响应
+  // 构建对话文本
   let conversationText = '=== 用户请求 ===\n';
   userMessages.forEach((msg, i) => {
     conversationText += `${i + 1}. ${msg}\n`;
   });
 
-  conversationText += '\n=== 助手响应摘要 ===\n';
-  // 只取最后几条助手响应（通常包含最终结果）
-  const recentResponses = assistantMessages.slice(-3);
-  recentResponses.forEach((msg, i) => {
-    // 截断过长的响应
-    const truncated = msg.length > 500 ? msg.substring(0, 500) + '...' : msg;
-    conversationText += `${i + 1}. ${truncated}\n`;
-  });
+  // 如果有助手响应，添加助手响应
+  if (assistantMessages.length > 0) {
+    conversationText += '\n=== 助手响应摘要 ===\n';
+    const recentResponses = assistantMessages.slice(-3);
+    recentResponses.forEach((msg, i) => {
+      const truncated = msg.length > 500 ? msg.substring(0, 500) + '...' : msg;
+      conversationText += `${i + 1}. ${truncated}\n`;
+    });
+  }
+
+  // 添加工具执行历史（帮助理解上下文）
+  if (toolExecutions.length > 0) {
+    conversationText += '\n=== 工具执行历史 ===\n';
+    const uniqueTools = [...new Set(toolExecutions)];
+    conversationText += `执行的工具: ${uniqueTools.join(', ')}\n`;
+    conversationText += `总共执行: ${toolExecutions.length} 次\n`;
+  }
 
   console.error('🔄 Analyzing session with Claude API...');
+  console.error(`📊 Session stats: ${userMessages.length} user messages, ${assistantMessages.length} assistant messages, ${toolExecutions.length} tool calls`);
 
   // 生成综合分析
   const analysis = await generateSessionSummary(conversationText, config);

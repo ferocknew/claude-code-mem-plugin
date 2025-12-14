@@ -19,6 +19,25 @@ const PORT = process.env.CLAUDE_MEM_WORKER_PORT || 37777;
 const HOST = process.env.CLAUDE_MEM_WORKER_HOST || '127.0.0.1';
 
 /**
+ * 读取 Claude 配置
+ */
+function loadClaudeConfig() {
+  try {
+    const settingsPath = path.join(os.homedir(), '.claude', 'settings.json');
+    if (fs.existsSync(settingsPath)) {
+      const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+      if (settings.env) {
+        console.error('✅ Loaded Claude settings from ~/.claude/settings.json');
+        return settings.env;
+      }
+    }
+  } catch (error) {
+    console.error('⚠️  Failed to load Claude settings:', error.message);
+  }
+  return {};
+}
+
+/**
  * 确保目录存在
  */
 if (!fs.existsSync(DATA_DIR)) {
@@ -111,12 +130,19 @@ async function startWorker() {
 
   console.error('🚀 Starting Worker service...');
 
+  // 加载 Claude 配置
+  const claudeConfig = loadClaudeConfig();
+
+  // 打开日志文件
+  const logStream = fs.openSync(LOG_FILE, 'a');
+
   // 启动 Worker 进程
   const worker = spawn('node', [WORKER_SCRIPT], {
     detached: true,
-    stdio: ['ignore', 'ignore', 'ignore'],
+    stdio: ['ignore', logStream, logStream], // 将 stdout 和 stderr 重定向到日志文件
     env: {
       ...process.env,
+      ...claudeConfig, // 注入 Claude 配置
       CLAUDE_MEM_WORKER_PORT: PORT,
       CLAUDE_MEM_WORKER_HOST: HOST,
     },
