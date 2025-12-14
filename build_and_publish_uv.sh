@@ -55,6 +55,29 @@ if [ -f "pyproject.toml" ]; then
     echo "  ✅ 更新 pyproject.toml"
 fi
 
+# 同步版本号到 plugin.json
+echo "🔄 同步版本号到 plugin.json..."
+# 更新根目录的 .claude-plugin/plugin.json
+if [ -f ".claude-plugin/plugin.json" ]; then
+    sed -i.bak 's/"version": "[^"]*"/"version": "'"$VERSION"'"/' .claude-plugin/plugin.json
+    rm -f .claude-plugin/plugin.json.bak
+    echo "  ✅ 更新 .claude-plugin/plugin.json"
+fi
+
+# 更新 plugin 目录的 .claude-plugin/plugin.json
+if [ -f "plugin/.claude-plugin/plugin.json" ]; then
+    sed -i.bak 's/"version": "[^"]*"/"version": "'"$VERSION"'"/' plugin/.claude-plugin/plugin.json
+    rm -f plugin/.claude-plugin/plugin.json.bak
+    echo "  ✅ 更新 plugin/.claude-plugin/plugin.json"
+fi
+
+# 更新 plugin 目录的 package.json
+if [ -f "plugin/package.json" ]; then
+    sed -i.bak 's/"version": "[^"]*"/"version": "'"$VERSION"'"/' plugin/package.json
+    rm -f plugin/package.json.bak
+    echo "  ✅ 更新 plugin/package.json"
+fi
+
 echo "📦 包信息:"
 echo "  名称: $PACKAGE_NAME"
 echo "  版本: $VERSION"

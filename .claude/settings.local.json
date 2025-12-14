@@ -5,7 +5,12 @@
       "Bash(python:*)",
       "Bash(bash:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(./build_and_publish_uv.sh)",
+      "Bash(chmod:*)",
+      "Bash(curl:*)",
+      "Bash(claude plugin list:*)",
+      "Bash(claude plugin)"
     ]
   }
 }
