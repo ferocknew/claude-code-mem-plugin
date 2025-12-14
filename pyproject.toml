@@ -1,6 +1,6 @@
 [project]
 name = "claude-code-mem-plugin"
-version = "0.1.1"
+version = "0.1.2"
 description = "Claude Code Memory Plugin Client - MCP client for remote memory server"
 authors = [{name = "ferocknew"}]
 readme = "README.md"
