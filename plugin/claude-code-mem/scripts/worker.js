@@ -148,34 +148,61 @@ function readMemoryFile(limit = 100) {
 }
 
 /**
- * 获取统计信息
+ * 获取统计信息（读取完整文件进行统计）
  */
 function getStats() {
   try {
-    const records = readMemoryFile(1000); // 读取最近 1000 条
+    if (!fs.existsSync(MEMORY_FILE)) {
+      return {
+        totalRecords: 0,
+        totalSessions: 0,
+        totalObservations: 0,
+        by_type: {},
+      };
+    }
+
+    const content = fs.readFileSync(MEMORY_FILE, 'utf8');
+    const lines = content.trim().split('\n').filter(line => line.trim());
 
     const stats = {
-      total_records: records.length,
+      totalRecords: lines.length,
+      totalSessions: 0,
+      totalObservations: 0,
       by_type: {},
-      recent_sessions: 0,
-      recent_summaries: 0,
-      recent_observations: 0,
     };
 
     // 统计类型
-    records.forEach(record => {
-      const type = record.type || 'unknown';
-      stats.by_type[type] = (stats.by_type[type] || 0) + 1;
+    lines.forEach(line => {
+      try {
+        const record = JSON.parse(line);
+        const type = record.type || 'unknown';
+        stats.by_type[type] = (stats.by_type[type] || 0) + 1;
+      } catch (error) {
+        // 忽略解析错误的行
+      }
     });
 
-    stats.recent_sessions = stats.by_type['session_event'] || 0;
-    stats.recent_summaries = stats.by_type['session_summary'] || 0;
-    stats.recent_observations = stats.by_type['observation'] || 0;
+    // 会话数 = session_start 事件数量
+    const sessionStarts = lines.filter(line => {
+      try {
+        const record = JSON.parse(line);
+        return record.type === 'session_event' && record.event === 'session_start';
+      } catch (error) {
+        return false;
+      }
+    });
+    stats.totalSessions = sessionStarts.length;
+    stats.totalObservations = stats.by_type['observation'] || 0;
 
     return stats;
   } catch (error) {
     console.error('[Worker] Error getting stats:', error.message);
-    return { error: error.message };
+    return {
+      error: error.message,
+      totalRecords: 0,
+      totalSessions: 0,
+      totalObservations: 0,
+    };
   }
 }
 
@@ -356,6 +383,45 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // 静态文件服务（UI页面）
+  if (req.method === 'GET' && (req.url === '/' || req.url === '/index.html')) {
+    const indexPath = path.join(__dirname, '..', 'ui', 'index.html');
+    if (fs.existsSync(indexPath)) {
+      const content = fs.readFileSync(indexPath, 'utf8');
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(content);
+    } else {
+      res.writeHead(404, { 'Content-Type': 'text/plain' });
+      res.end('UI not found');
+    }
+    return;
+  }
+
+  // 提供静态资源（CSS, JS 等）
+  if (req.method === 'GET' && (req.url.startsWith('/ui/') || req.url.startsWith('/static/'))) {
+    const resourcePath = path.join(__dirname, '..', req.url);
+    if (fs.existsSync(resourcePath)) {
+      const ext = path.extname(resourcePath);
+      const contentType = {
+        '.css': 'text/css; charset=utf-8',
+        '.js': 'application/javascript; charset=utf-8',
+        '.json': 'application/json',
+        '.png': 'image/png',
+        '.jpg': 'image/jpeg',
+        '.gif': 'image/gif',
+        '.svg': 'image/svg+xml'
+      }[ext] || 'application/octet-stream';
+
+      const content = fs.readFileSync(resourcePath);
+      res.writeHead(200, { 'Content-Type': contentType });
+      res.end(content);
+    } else {
+      res.writeHead(404);
+      res.end();
+    }
+    return;
+  }
+
   // 404
   res.writeHead(404, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify({ error: 'Not found' }));
@@ -365,12 +431,17 @@ const server = http.createServer((req, res) => {
  * 启动服务器
  */
 server.listen(PORT, HOST, () => {
+  console.error('='.repeat(60));
   console.error(`[Worker] Claude Mem Worker started on http://${HOST}:${PORT}`);
-  console.error(`[Worker] Health check: http://${HOST}:${PORT}/health`);
-  console.error(`[Worker] Analysis API: http://${HOST}:${PORT}/api/analyze`);
-  console.error(`[Worker] Records API: http://${HOST}:${PORT}/api/records?limit=100`);
-  console.error(`[Worker] Stats API: http://${HOST}:${PORT}/api/stats`);
-  console.error(`[Worker] Memory file: ${MEMORY_FILE}`);
+  console.error('='.repeat(60));
+  console.error(`🌐 Web UI:         http://${HOST}:${PORT}/`);
+  console.error(`❤️  Health check:  http://${HOST}:${PORT}/health`);
+  console.error(`📊 Stats API:      http://${HOST}:${PORT}/api/stats`);
+  console.error(`📝 Records API:    http://${HOST}:${PORT}/api/records?limit=100`);
+  console.error(`⚙️  Analysis API:   http://${HOST}:${PORT}/api/analyze`);
+  console.error('='.repeat(60));
+  console.error(`📁 Memory file:    ${MEMORY_FILE}`);
+  console.error('='.repeat(60));
 
   // 启动心跳监控
   startHeartbeatMonitor();

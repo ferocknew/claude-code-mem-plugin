@@ -155,7 +155,8 @@ async function startWorker() {
   worker.unref();
 
   console.error(`✅ Worker started with PID ${worker.pid}`);
-  console.error(`📍 Worker URL: http://${HOST}:${PORT}`);
+  console.error(`📍 Worker API: http://${HOST}:${PORT}`);
+  console.error(`🌐 Web UI: http://${HOST}:${PORT}/`);
   console.error(`📝 PID file: ${PID_FILE}`);
 
   // 等待 Worker 启动
@@ -165,6 +166,7 @@ async function startWorker() {
 
     if (await isWorkerAvailable()) {
       console.error('✅ Worker is ready!');
+      console.error(`🌐 Access Web UI at: http://${HOST}:${PORT}/`);
       return;
     }
   }
