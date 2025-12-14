@@ -277,12 +277,12 @@ async function analyzeSession(sessionData) {
 
   // 如果有助手响应，添加助手响应
   if (assistantMessages.length > 0) {
-    conversationText += '\n=== 助手响应摘要 ===\n';
-    const recentResponses = assistantMessages.slice(-3);
-    recentResponses.forEach((msg, i) => {
-      const truncated = msg.length > 500 ? msg.substring(0, 500) + '...' : msg;
-      conversationText += `${i + 1}. ${truncated}\n`;
-    });
+  conversationText += '\n=== 助手响应摘要 ===\n';
+  const recentResponses = assistantMessages.slice(-3);
+  recentResponses.forEach((msg, i) => {
+    const truncated = msg.length > 500 ? msg.substring(0, 500) + '...' : msg;
+    conversationText += `${i + 1}. ${truncated}\n`;
+  });
   }
 
   // 添加工具执行历史（帮助理解上下文）

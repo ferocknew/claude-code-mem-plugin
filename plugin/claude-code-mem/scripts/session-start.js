@@ -9,10 +9,18 @@ const os = require('os');
 const DATA_DIR = path.join(os.homedir(), '.claude-code-mem');
 const MEMORY_FILE = path.join(DATA_DIR, 'mem.jsonl');
 const SESSION_FILE = path.join(DATA_DIR, 'current_session.json');
+const HEARTBEAT_FILE = path.join(DATA_DIR, 'heartbeat.txt');
 
 // 确保目录存在
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
+}
+
+// 更新心跳
+try {
+  fs.writeFileSync(HEARTBEAT_FILE, Date.now().toString(), 'utf8');
+} catch (error) {
+  // 忽略心跳更新错误
 }
 
 // 记录会话开始
