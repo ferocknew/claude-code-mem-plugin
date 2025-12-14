@@ -1,36 +1,14 @@
-# 只包含 plugin 目录
+# 只包含 plugin 目录及必要文件
 graft plugin
 
-# 包含顶层文件
+# 包含必要的顶层文件
 include LICENSE
 include README.md
+include VERSION
 
-# 排除所有其他内容
+# 排除开发文件
 global-exclude .git*
 global-exclude .DS_Store
 global-exclude __pycache__
 global-exclude *.py[cod]
 global-exclude *.so
-
-# 明确排除开发文件和目录
-prune client
-prune hooks
-prune server
-prune docker
-prune scripts
-prune tests
-prune examples
-prune data
-prune .claude
-prune .claude-plugin
-exclude VERSION
-exclude .gitignore
-exclude compose.yaml
-exclude env.example
-exclude requirements.txt
-exclude build_and_publish_uv.sh
-exclude start_plugin.sh
-exclude uv.lock
-exclude pyproject.toml
-exclude MANIFEST.in
-exclude CLAUDE.md

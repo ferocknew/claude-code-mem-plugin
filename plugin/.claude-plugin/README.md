@@ -16,6 +16,12 @@
 ### 方式一：通过插件市场安装（推荐）
 
 ```bash
+# 使用私有 PyPI 源（如 Nexus）
+export UVX_INDEX_URL=https://私服地址/repository/pypi-group/simple
+
+# 启动 Claude Code（环境变量会在安装时自动配置 MCP 服务器）
+claude
+
 # 添加插件市场
 /plugin marketplace add yourusername/claude-code-mem-plugin
 
@@ -25,6 +31,8 @@
 # 启用插件
 /plugin enable claude-mem
 ```
+
+**注意**: 如果使用默认 PyPI 源，直接启动 Claude Code 即可，无需设置 `UVX_INDEX_URL`。
 
 ### 方式二：本地安装
 

@@ -21,8 +21,8 @@ dependencies = [
 ]
 
 [project.scripts]
-# 插件入口点
-claude-mem-client = "client.mcp_client:main"
+# 插件入口点 - 使用 plugin 目录下的 mcp_client 模块
+claude-mem-client = "plugin.mcp_client.mcp_client:main"
 
 [project.optional-dependencies]
 dev = [
@@ -43,18 +43,13 @@ pattern = "(?P<version>.+)"
 
 [tool.hatch.build.targets.wheel]
 packages = ["plugin"]
-only-include = ["plugin"]
 
 [tool.hatch.build.targets.sdist]
-only-include = [
-    "plugin",
+include = [
+    "plugin/",
     "LICENSE",
     "README.md",
     "VERSION"
-]
-exclude = [
-    ".gitignore",
-    "pyproject.toml"
 ]
 
 [tool.uv]

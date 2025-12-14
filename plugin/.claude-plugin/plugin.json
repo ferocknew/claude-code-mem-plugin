@@ -13,5 +13,16 @@
     "conversation",
     "history",
     "search"
-  ]
+  ],
+  "install": "node .claude-plugin/install.js",
+  "mcpServers": {
+    "claude-memory": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "claude-code-mem-plugin",
+        "claude-mem-client"
+      ]
+    }
+  }
 }
