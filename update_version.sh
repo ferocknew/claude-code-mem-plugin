@@ -39,6 +39,28 @@ if [ -f "plugin/.claude-plugin/plugin.json" ]; then
     echo "✅ 更新 plugin/.claude-plugin/plugin.json"
 fi
 
+# 同步到 plugin/claude-code-mem/.claude-plugin/plugin.json
+if [ -f "plugin/claude-code-mem/.claude-plugin/plugin.json" ]; then
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        sed -i '' 's/"version": "[^"]*"/"version": "'"$VERSION"'"/' plugin/claude-code-mem/.claude-plugin/plugin.json
+    else
+        sed -i 's/"version": "[^"]*"/"version": "'"$VERSION"'"/' plugin/claude-code-mem/.claude-plugin/plugin.json
+    fi
+    echo "✅ 更新 plugin/claude-code-mem/.claude-plugin/plugin.json"
+fi
+
+# 同步到 .claude-plugin/marketplace.json (如果有版本字段)
+if [ -f ".claude-plugin/marketplace.json" ]; then
+    if grep -q '"version"' .claude-plugin/marketplace.json; then
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            sed -i '' 's/"version": "[^"]*"/"version": "'"$VERSION"'"/' .claude-plugin/marketplace.json
+        else
+            sed -i 's/"version": "[^"]*"/"version": "'"$VERSION"'"/' .claude-plugin/marketplace.json
+        fi
+        echo "✅ 更新 .claude-plugin/marketplace.json"
+    fi
+fi
+
 # 同步到 plugin/.claude-plugin/marketplace.json (如果有版本字段)
 if [ -f "plugin/.claude-plugin/marketplace.json" ]; then
     if grep -q '"version"' plugin/.claude-plugin/marketplace.json; then
