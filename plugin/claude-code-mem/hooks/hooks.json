@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/session-start.js\"",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/script/session-start.js\"",
             "timeout": 30
           }
         ]
@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/user-prompt.js\"",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/script/user-prompt.js\"",
             "timeout": 10
           }
         ]
@@ -29,7 +29,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/post-tool.js\"",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/script/post-tool.js\"",
             "timeout": 10
           }
         ]
@@ -40,7 +40,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/stop.js\"",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/script/stop.js\"",
             "timeout": 10
           }
         ]
