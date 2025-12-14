@@ -1,6 +1,6 @@
 {
-  "name": "claude-mem",
-  "displayName": "Claude Memory Plugin",
+  "name": "claude-code-mem",
+  "displayName": "Claude Code Memory Plugin",
   "version": "0.1.0",
   "description": "基于 MCP (Model Context Protocol) 的 Claude Code 记忆插件，用于记录和管理系统对话内容",
   "author": "AI Assistant",
