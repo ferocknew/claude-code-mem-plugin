@@ -11,5 +11,8 @@
     "postinstall": "echo '✅ Claude Code Memory Plugin installed successfully'"
   },
   "dependencies": {
+  },
+  "engines": {
+    "node": ">=22.0.0"
   }
 }
