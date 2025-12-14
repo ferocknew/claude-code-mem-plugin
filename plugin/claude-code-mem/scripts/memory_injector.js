@@ -53,7 +53,7 @@ function loadConfig() {
 /**
  * 搜索知识图谱
  */
-function searchKnowledgeGraph(userInput) {
+function searchKnowledgeGraph(userInput, config) {
   if (!fs.existsSync(GRAPH_FILE)) {
     log('📁 Knowledge graph not found');
     return { entities: [], relations: [] };
@@ -80,7 +80,7 @@ function searchKnowledgeGraph(userInput) {
 
   // 提取关键词
   const keywords = extractKeywords(userInput);
-  log(`🔍 Keywords extracted: ${keywords.join(', ')}`);
+  log(`🔍 Keywords extracted: [${keywords.join(', ')}]`);
 
   if (keywords.length === 0) {
     log('⚠️  No keywords found');
@@ -91,41 +91,71 @@ function searchKnowledgeGraph(userInput) {
   const scoredEntities = [];
   for (const entity of entities) {
     let score = 0;
+    const matchReasons = [];
 
+    // 名称匹配
     for (const keyword of keywords) {
       if (entity.name.toLowerCase().includes(keyword.toLowerCase())) {
         score += 10;
+        matchReasons.push(`名称匹配"${keyword}"`);
       }
     }
 
+    // 观察内容匹配
     for (const obs of entity.observations || []) {
       for (const keyword of keywords) {
         if (obs.toLowerCase().includes(keyword.toLowerCase())) {
           score += 2;
+          matchReasons.push(`观察匹配"${keyword}"`);
         }
       }
     }
 
+    // 时间权重
     if (entity.timestamp) {
       const daysSince = (Date.now() - new Date(entity.timestamp)) / (1000 * 60 * 60 * 24);
-      if (daysSince < 7) score += 3;
-      else if (daysSince < 30) score += 1;
+      if (daysSince < 7) {
+        score += 3;
+        matchReasons.push('7天内');
+      } else if (daysSince < 30) {
+        score += 1;
+        matchReasons.push('30天内');
+      }
     }
 
     if (score > 0) {
-      scoredEntities.push({ entity, score });
+      scoredEntities.push({ entity, score, matchReasons });
     }
   }
 
   scoredEntities.sort((a, b) => b.score - a.score);
-  const relevantEntities = scoredEntities.slice(0, 5).map(s => s.entity);
+
+  // 使用配置的最大实体数
+  const maxEntities = config.max_entities || 5;
+  const topEntities = scoredEntities.slice(0, maxEntities);
+  const relevantEntities = topEntities.map(s => s.entity);
+
+  // 详细日志：显示匹配的实体及得分
+  log(`\n📋 匹配实体详情 (最多 ${maxEntities} 个):`);
+  topEntities.forEach((item, idx) => {
+    log(`  ${idx + 1}. [${item.score}分] ${item.entity.name} (${item.entity.entityType})`);
+    log(`     原因: ${item.matchReasons.join(', ')}`);
+  });
 
   const entityNames = new Set(relevantEntities.map(e => e.name));
   const relevantRelations = relations.filter(
     r => entityNames.has(r.from) || entityNames.has(r.to)
   );
 
-  log(`✅ Found: ${relevantEntities.length} entities, ${relevantRelations.slice(0, 5).length} relations`);
+  const maxRelations = Math.min(relevantRelations.length, 5);
+  log(`\n✅ Found: ${relevantEntities.length} entities, ${maxRelations} relations`);
+
+  if (relevantRelations.length > 0) {
+    log(`\n🔗 关系详情:`);
+    relevantRelations.slice(0, 5).forEach((rel, idx) => {
+      log(`  ${idx + 1}. ${rel.from} --[${rel.relationType}]--> ${rel.to}`);
+    });
+  }
 
   return {
     entities: relevantEntities,
@@ -227,14 +257,19 @@ process.stdin.on('end', () => {
       return;
     }
 
-    const memoryData = searchKnowledgeGraph(userInput);
+    const memoryData = searchKnowledgeGraph(userInput, config);
 
     let enhancedPrompt = userInput;
     if (memoryData.entities.length > 0) {
       const memoryContext = formatMemoryContext(memoryData, config);
       enhancedPrompt = memoryContext + userInput;
 
-      log(`🧠 Memory injected: ${memoryData.entities.length} entities, ${memoryData.relations.length} relations`);
+      log(`\n🧠 Memory injected: ${memoryData.entities.length} entities, ${memoryData.relations.length} relations`);
+
+      // 显示注入内容预览
+      log(`\n📄 注入内容预览 (前300字符):`);
+      const preview = memoryContext.substring(0, 300).replace(/\n/g, '\n   ');
+      log(`   ${preview}...`);
     } else {
       log('🔍 No relevant memory found');
     }
