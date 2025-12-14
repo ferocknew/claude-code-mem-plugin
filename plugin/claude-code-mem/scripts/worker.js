@@ -19,7 +19,7 @@ const HEARTBEAT_FILE = path.join(DATA_DIR, 'heartbeat.txt');
 
 // 心跳检测配置
 const HEARTBEAT_CHECK_INTERVAL = 10000; // 10 秒检查一次
-const PARENT_PROCESS_CHECK = true; // 启用父进程检测
+const PARENT_PROCESS_CHECK = false; // 禁用父进程检测（使用心跳文件替代）
 
 // 记录启动时的父进程 PID
 const PARENT_PID = process.ppid;

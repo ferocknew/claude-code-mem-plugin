@@ -87,28 +87,68 @@ async function isWorkerAvailable() {
 }
 
 /**
- * 清理过期的 PID 文件
+ * 强制停止旧的 Worker 进程
  */
-function cleanupPidFile() {
+function killOldWorker() {
   if (!fs.existsSync(PID_FILE)) {
+    console.error('📝 No PID file found, this is a fresh start');
     return;
   }
 
   try {
     const pid = parseInt(fs.readFileSync(PID_FILE, 'utf8'));
+
     // 尝试检查进程是否存在
     try {
       process.kill(pid, 0);
-      // 进程存在
+      // 进程存在，强制 kill 它
+      console.error(`🔪 Found old worker process (PID: ${pid}), killing it...`);
+      try {
+        process.kill(pid, 'SIGTERM');
+        console.error(`✅ Sent SIGTERM to PID ${pid}`);
+
+        // 等待一会儿，确保进程被杀死
+        const maxWait = 3000; // 最多等待 3 秒
+        const startTime = Date.now();
+        while (Date.now() - startTime < maxWait) {
+          try {
+            process.kill(pid, 0);
+            // 进程还在，继续等待
+            require('child_process').execSync('sleep 0.1');
+          } catch (error) {
+            // 进程已经不存在了
+            console.error(`✅ Old worker process stopped`);
+            break;
+          }
+        }
+
+        // 如果还在运行，强制 SIGKILL
+        try {
+          process.kill(pid, 0);
+          console.error(`⚠️  Process still running, sending SIGKILL...`);
+          process.kill(pid, 'SIGKILL');
+        } catch (error) {
+          // 进程已停止
+        }
+
+      } catch (killError) {
+        console.error(`⚠️  Failed to kill process: ${killError.message}`);
+      }
     } catch (error) {
-      // 进程不存在，清理 PID 文件
-      fs.unlinkSync(PID_FILE);
-      console.error('🧹 Cleaned up stale PID file');
+      // 进程不存在
+      console.error('🧹 Old PID file found but process not running');
     }
+
+    // 清理 PID 文件
+    fs.unlinkSync(PID_FILE);
+    console.error('🧹 Cleaned up old PID file');
+
   } catch (error) {
     // PID 文件损坏，删除
+    console.error(`⚠️  Error reading PID file: ${error.message}`);
     try {
       fs.unlinkSync(PID_FILE);
+      console.error('🧹 Removed corrupted PID file');
     } catch (e) {
       // 忽略
     }
@@ -119,14 +159,8 @@ function cleanupPidFile() {
  * 启动 Worker
  */
 async function startWorker() {
-  // 首先检查 Worker 是否通过 API 响应
-  if (await isWorkerAvailable()) {
-    console.error('✅ Worker already running and healthy');
-    return;
-  }
-
-  // Worker 不可用，清理可能的过期 PID
-  cleanupPidFile();
+  // 强制停止旧的 Worker 进程（如果存在）
+  killOldWorker();
 
   console.error('🚀 Starting Worker service...');
 
