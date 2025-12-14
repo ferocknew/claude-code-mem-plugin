@@ -2,6 +2,8 @@
 
 基于 MCP (Model Context Protocol) 的 Claude Code 记忆插件，用于记录和管理系统对话内容。
 
+> **版本说明**: 项目版本号由 [`VERSION`](VERSION) 文件统一管理，该文件为全局版本号配置文件。所有组件的版本号应与此文件保持一致。
+
 ## 项目架构
 
 ### 客户端 (Claude Code 插件)
