@@ -11,7 +11,8 @@
       "Bash(curl:*)",
       "Bash(claude plugin list:*)",
       "Bash(claude plugin)",
-      "mcp__memory__search_nodes"
+      "mcp__memory__search_nodes",
+      "mcp__memory__create_entities"
     ]
   }
 }

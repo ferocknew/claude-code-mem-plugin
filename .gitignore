@@ -63,3 +63,5 @@ htmlcov/
 # Claude Plugin - 不忽略插件配置目录
 !.claude-plugin/
 !.claude-plugin/**
+/demo/
+/demo/

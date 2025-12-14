@@ -9,6 +9,7 @@ const { randomUUID } = require('crypto');
 
 const DATA_DIR = path.join(os.homedir(), '.claude-code-mem');
 const MEMORY_FILE = path.join(DATA_DIR, 'mem.jsonl');
+const SESSION_FILE = path.join(DATA_DIR, 'current_session.json');
 
 // 从 stdin 读取数据
 let inputData = '';
@@ -32,8 +33,16 @@ process.stdin.on('end', () => {
         timestamp: new Date().toISOString(),
       };
 
+      // 记录到主文件
       fs.appendFileSync(MEMORY_FILE, JSON.stringify(record) + '\n', 'utf8');
       console.error(`✅ Recorded tool execution: ${toolName}`);
+
+      // 添加到当前会话数据
+      if (fs.existsSync(SESSION_FILE)) {
+        const sessionData = JSON.parse(fs.readFileSync(SESSION_FILE, 'utf8'));
+        sessionData.push(record);
+        fs.writeFileSync(SESSION_FILE, JSON.stringify(sessionData, null, 2), 'utf8');
+      }
     }
   } catch (error) {
     console.error(`❌ Error processing tool execution: ${error.message}`);

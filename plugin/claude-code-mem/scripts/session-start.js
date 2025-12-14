@@ -8,6 +8,7 @@ const os = require('os');
 
 const DATA_DIR = path.join(os.homedir(), '.claude-code-mem');
 const MEMORY_FILE = path.join(DATA_DIR, 'mem.jsonl');
+const SESSION_FILE = path.join(DATA_DIR, 'current_session.json');
 
 // 确保目录存在
 if (!fs.existsSync(DATA_DIR)) {
@@ -24,3 +25,6 @@ const record = {
 fs.appendFileSync(MEMORY_FILE, JSON.stringify(record) + '\n', 'utf8');
 console.error(`✅ Session started at ${record.timestamp}`);
 
+// 初始化当前会话文件（用于收集会话数据）
+fs.writeFileSync(SESSION_FILE, JSON.stringify([]), 'utf8');
+console.error(`✅ Initialized session data file`);

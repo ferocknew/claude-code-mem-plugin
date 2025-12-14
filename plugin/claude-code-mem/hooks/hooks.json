@@ -6,8 +6,15 @@
         "hooks": [
           {
             "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/start_worker.js\"",
+            "timeout": 30,
+            "description": "Start Worker service"
+          },
+          {
+            "type": "command",
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/session-start.js\"",
-            "timeout": 30
+            "timeout": 30,
+            "description": "Record session start"
           }
         ]
       }
@@ -41,7 +48,14 @@
           {
             "type": "command",
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/stop.js\"",
-            "timeout": 10
+            "timeout": 10,
+            "description": "Record session end"
+          },
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/stop_worker.js\"",
+            "timeout": 30,
+            "description": "Stop Worker service"
           }
         ]
       }
