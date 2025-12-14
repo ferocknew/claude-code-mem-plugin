@@ -126,14 +126,14 @@ function submitToWorker() {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Content-Length': data.length,
+        'Content-Length': Buffer.byteLength(data), // 使用字节长度而不是字符长度
       },
       timeout: 2000, // 2 秒超时
     };
 
     debugLog('Submitting to Worker', {
       url: `http://${WORKER_HOST}:${WORKER_PORT}/api/analyze`,
-      data_size: data.length,
+      data_size: Buffer.byteLength(data),
     });
 
     const req = http.request(options, (res) => {
