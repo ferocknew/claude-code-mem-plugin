@@ -1,0 +1,14 @@
+{
+  "enabled": true,
+  "max_entities": 5,
+  "injection_mode": "auto",
+  "show_marker": true,
+  "debug": true,
+  "description": {
+    "enabled": "是否启用记忆注入",
+    "max_entities": "最多注入几个实体",
+    "injection_mode": "注入模式: auto(自动), always(总是), manual(手动)",
+    "show_marker": "是否显示 🧠 标记(方便验证插件是否工作)",
+    "debug": "是否显示调试信息"
+  }
+}

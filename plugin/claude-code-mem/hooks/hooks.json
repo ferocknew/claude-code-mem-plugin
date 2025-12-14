@@ -24,6 +24,12 @@
         "hooks": [
           {
             "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/memory_injector.js\"",
+            "timeout": 5,
+            "description": "Inject relevant memories into user prompt"
+          },
+          {
+            "type": "command",
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/user-prompt.js\"",
             "timeout": 10
           }
@@ -50,6 +56,12 @@
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/stop.js\"",
             "timeout": 10,
             "description": "Record session end and submit to Worker"
+          },
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/knowledge_graph_builder.js\"",
+            "timeout": 5,
+            "description": "Build knowledge graph from session data"
           }
         ]
       }

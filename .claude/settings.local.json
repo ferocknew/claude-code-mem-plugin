@@ -13,7 +13,9 @@
       "Bash(claude plugin)",
       "mcp__memory__search_nodes",
       "mcp__memory__create_entities",
-      "mcp__memory__read_graph"
+      "mcp__memory__read_graph",
+      "mcp__searxng__searxng_web_search",
+      "mcp__searxng__whoogle_web_search"
     ]
   }
 }
