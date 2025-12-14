@@ -1,24 +1,12 @@
 {
   "name": "claude-code-mem",
-  "displayName": "Claude Code Memory Plugin",
   "version": "0.1.0",
   "description": "基于 MCP (Model Context Protocol) 的 Claude Code 记忆插件，用于记录和管理系统对话内容",
-  "author": "ferocknew",
+  "author": {
+    "name": "ferocknew"
+  },
   "license": "MIT",
   "repository": "https://github.com/ferocknew/claude-code-mem-plugin",
-  "mcpServers": {
-    "claude-memory": {
-      "command": "uvx",
-      "args": [
-        "--from",
-        "claude-code-mem-plugin==0.1.0",
-        "claude-mem-client"
-      ],
-      "env": {
-        "UVX_INDEX_URL": "${UVX_INDEX_URL}"
-      }
-    }
-  },
   "keywords": [
     "memory",
     "mcp",

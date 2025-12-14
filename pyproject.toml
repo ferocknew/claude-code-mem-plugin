@@ -47,7 +47,7 @@ dev-dependencies = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["server"]
+packages = ["client"]
 
 [tool.black]
 line-length = 88
