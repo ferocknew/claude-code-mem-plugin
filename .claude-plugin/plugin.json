@@ -10,9 +10,13 @@
     "claude-memory": {
       "command": "uvx",
       "args": [
-        "--from", "claude-code-mem-plugin",
+        "--from",
+        "claude-code-mem-plugin==0.1.0",
         "claude-mem-client"
-      ]
+      ],
+      "env": {
+        "UVX_INDEX_URL": "${UVX_INDEX_URL}"
+      }
     }
   },
   "keywords": [
@@ -20,9 +24,6 @@
     "mcp",
     "conversation",
     "history",
-    "search",
-    "cache",
-    "sqlite",
-    "redis"
+    "search"
   ]
 }
