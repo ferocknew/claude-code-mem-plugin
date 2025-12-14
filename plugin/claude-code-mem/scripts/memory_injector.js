@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * 记忆注入器
- * 在用户提交 prompt 时,自动搜索相关记忆并注入上下文
+ * 增强版记忆注入器 - 带日志记录
+ * 在原有基础上添加文件日志功能
  */
 const fs = require('fs');
 const path = require('path');
@@ -10,13 +10,29 @@ const os = require('os');
 const DATA_DIR = path.join(os.homedir(), '.claude-code-mem');
 const GRAPH_FILE = path.join(DATA_DIR, 'knowledge_graph.jsonl');
 const CONFIG_FILE = path.join(path.dirname(__filename), '..', 'memory_config.json');
+const LOG_FILE = path.join(DATA_DIR, 'injection_debug.log');
+
+// 日志函数
+function log(message) {
+  const timestamp = new Date().toISOString();
+  const logMessage = `[${timestamp}] ${message}\n`;
+
+  try {
+    fs.appendFileSync(LOG_FILE, logMessage, 'utf8');
+  } catch (e) {
+    // 忽略日志错误
+  }
+
+  // 同时输出到 stderr
+  console.error(message);
+}
 
 // 默认配置
 const DEFAULT_CONFIG = {
   enabled: true,
   max_entities: 5,
-  injection_mode: 'auto', // auto, always, manual
-  show_marker: true, // 显示注入标记,方便验证
+  injection_mode: 'auto',
+  show_marker: true,
   debug: true
 };
 
@@ -29,7 +45,7 @@ function loadConfig() {
       return { ...DEFAULT_CONFIG, ...JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8')) };
     }
   } catch (e) {
-    // 使用默认配置
+    log(`⚠️  Config load error: ${e.message}`);
   }
   return DEFAULT_CONFIG;
 }
@@ -39,6 +55,7 @@ function loadConfig() {
  */
 function searchKnowledgeGraph(userInput) {
   if (!fs.existsSync(GRAPH_FILE)) {
+    log('📁 Knowledge graph not found');
     return { entities: [], relations: [] };
   }
 
@@ -46,7 +63,6 @@ function searchKnowledgeGraph(userInput) {
   const entities = [];
   const relations = [];
 
-  // 解析图谱
   for (const line of lines) {
     try {
       const item = JSON.parse(line);
@@ -60,9 +76,14 @@ function searchKnowledgeGraph(userInput) {
     }
   }
 
+  log(`📊 Graph loaded: ${entities.length} entities, ${relations.length} relations`);
+
   // 提取关键词
   const keywords = extractKeywords(userInput);
+  log(`🔍 Keywords extracted: ${keywords.join(', ')}`);
+
   if (keywords.length === 0) {
+    log('⚠️  No keywords found');
     return { entities: [], relations: [] };
   }
 
@@ -71,14 +92,12 @@ function searchKnowledgeGraph(userInput) {
   for (const entity of entities) {
     let score = 0;
 
-    // 1. 实体名称匹配
     for (const keyword of keywords) {
       if (entity.name.toLowerCase().includes(keyword.toLowerCase())) {
         score += 10;
       }
     }
 
-    // 2. 观察内容匹配
     for (const obs of entity.observations || []) {
       for (const keyword of keywords) {
         if (obs.toLowerCase().includes(keyword.toLowerCase())) {
@@ -87,7 +106,6 @@ function searchKnowledgeGraph(userInput) {
       }
     }
 
-    // 3. 时间权重 (最近的记录权重高)
     if (entity.timestamp) {
       const daysSince = (Date.now() - new Date(entity.timestamp)) / (1000 * 60 * 60 * 24);
       if (daysSince < 7) score += 3;
@@ -99,15 +117,15 @@ function searchKnowledgeGraph(userInput) {
     }
   }
 
-  // 按得分排序
   scoredEntities.sort((a, b) => b.score - a.score);
   const relevantEntities = scoredEntities.slice(0, 5).map(s => s.entity);
 
-  // 获取相关关系
   const entityNames = new Set(relevantEntities.map(e => e.name));
   const relevantRelations = relations.filter(
     r => entityNames.has(r.from) || entityNames.has(r.to)
   );
+
+  log(`✅ Found: ${relevantEntities.length} entities, ${relevantRelations.slice(0, 5).length} relations`);
 
   return {
     entities: relevantEntities,
@@ -142,7 +160,6 @@ function formatMemoryContext(memoryData, config) {
 
   let context = '';
 
-  // 添加可见标记 (方便验证插件是否工作)
   if (config.show_marker) {
     context += '\n\n🧠 **[插件注入的记忆]**\n\n';
   } else {
@@ -152,7 +169,6 @@ function formatMemoryContext(memoryData, config) {
   context += '<relevant_memory>\n';
   context += '根据记忆系统,以下信息可能相关:\n\n';
 
-  // 格式化实体
   for (const entity of entities) {
     context += `**${entity.name}** (${entity.entityType}):\n`;
     for (const obs of (entity.observations || []).slice(0, 3)) {
@@ -163,7 +179,6 @@ function formatMemoryContext(memoryData, config) {
     context += '\n';
   }
 
-  // 格式化关系
   if (relations.length > 0) {
     context += '**相关联系:**\n';
     for (const rel of relations) {
@@ -174,7 +189,6 @@ function formatMemoryContext(memoryData, config) {
 
   context += '</relevant_memory>\n\n';
 
-  // Debug 信息
   if (config.debug) {
     context += `<!-- 记忆注入: 找到 ${entities.length} 个相关实体 -->\n\n`;
   }
@@ -182,9 +196,7 @@ function formatMemoryContext(memoryData, config) {
   return context;
 }
 
-/**
- * 主程序
- */
+// 主程序
 let inputData = '';
 process.stdin.setEncoding('utf8');
 process.stdin.on('data', (chunk) => {
@@ -193,10 +205,13 @@ process.stdin.on('data', (chunk) => {
 
 process.stdin.on('end', () => {
   try {
-    const config = loadConfig();
+    log('🚀 Memory injection started');
 
-    // 检查是否启用
+    const config = loadConfig();
+    log(`⚙️  Config: enabled=${config.enabled}, show_marker=${config.show_marker}`);
+
     if (!config.enabled) {
+      log('❌ Memory injection disabled');
       console.log(inputData);
       return;
     }
@@ -204,26 +219,26 @@ process.stdin.on('end', () => {
     const data = JSON.parse(inputData);
     const userInput = data.prompt || data.content || '';
 
+    log(`📝 User input: ${userInput.substring(0, 50)}...`);
+
     if (!userInput) {
+      log('⚠️  Empty input');
       console.log(inputData);
       return;
     }
 
-    // 搜索相关记忆
     const memoryData = searchKnowledgeGraph(userInput);
 
-    // 注入记忆
     let enhancedPrompt = userInput;
     if (memoryData.entities.length > 0) {
       const memoryContext = formatMemoryContext(memoryData, config);
       enhancedPrompt = memoryContext + userInput;
 
-      console.error(`🧠 Memory injected: ${memoryData.entities.length} entities, ${memoryData.relations.length} relations`);
+      log(`🧠 Memory injected: ${memoryData.entities.length} entities, ${memoryData.relations.length} relations`);
     } else {
-      console.error(`🔍 No relevant memory found`);
+      log('🔍 No relevant memory found');
     }
 
-    // 输出修改后的数据
     const output = {
       ...data,
       prompt: enhancedPrompt,
@@ -231,8 +246,9 @@ process.stdin.on('end', () => {
     };
 
     console.log(JSON.stringify(output));
+    log('✅ Memory injection completed');
   } catch (error) {
-    console.error(`❌ Memory injection error: ${error.message}`);
-    console.log(inputData); // 失败时返回原始输入
+    log(`❌ Error: ${error.message}`);
+    console.log(inputData);
   }
 });
