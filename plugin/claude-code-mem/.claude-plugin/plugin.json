@@ -1,6 +1,6 @@
 {
   "name": "claude-code-mem",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "description": "基于本地文件的 Claude Code 记忆插件，通过 hooks 自动记录对话内容",
   "author": {
     "name": "ferocknew"
