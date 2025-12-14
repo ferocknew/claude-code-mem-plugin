@@ -47,16 +47,8 @@ echo "📋 当前版本: $VERSION"
 # 从 pyproject.toml 读取包名
 PACKAGE_NAME=$(grep '^name = ' pyproject.toml | sed 's/name = "\(.*\)"/\1/')
 
-# 同步版本号到 pyproject.toml
-echo "🔄 同步版本号到 pyproject.toml..."
-if [ -f "pyproject.toml" ]; then
-    sed -i.bak "s/^version = .*/version = \"$VERSION\"/" pyproject.toml
-    rm -f pyproject.toml.bak
-    echo "  ✅ 更新 pyproject.toml"
-fi
-
-# 同步版本号到 plugin.json
-echo "🔄 同步版本号到 plugin.json..."
+# 同步版本号到 plugin.json 文件
+echo "🔄 同步版本号到相关文件..."
 # 更新根目录的 .claude-plugin/plugin.json
 if [ -f ".claude-plugin/plugin.json" ]; then
     sed -i.bak 's/"version": "[^"]*"/"version": "'"$VERSION"'"/' .claude-plugin/plugin.json
