@@ -1,0 +1,23 @@
+# 插件包只包含 client 目录
+include client/
+exclude server/
+exclude docker/
+exclude scripts/
+exclude tests/
+exclude examples/
+exclude data/
+
+# 包含必要的配置文件
+include .claude-plugin/
+include LICENSE
+include README.md
+include VERSION
+
+# 排除不必要的文件
+exclude compose.yaml
+exclude env.example
+exclude requirements.txt
+global-exclude __pycache__
+global-exclude *.py[cod]
+global-exclude *.so
+global-exclude .DS_Store

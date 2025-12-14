@@ -1,12 +1,12 @@
 [project]
 name = "claude-code-mem-plugin"
 version = "0.1.0"
-description = "Claude Code Memory Plugin based on MCP"
-authors = [{name = "AI Assistant"}]
+description = "Claude Code Memory Plugin Client - MCP client for remote memory server"
+authors = [{name = "ferocknew"}]
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.12"
-keywords = ["claude-code", "mcp", "memory", "conversation", "history", "plugin"]
+keywords = ["claude-code", "mcp", "memory", "conversation", "history", "plugin", "client"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
@@ -14,18 +14,15 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
+
+# 插件只需要这些轻量级依赖
 dependencies = [
-    "fastmcp==2.14.0",
-    "fastapi==0.124.4",
-    "uvicorn[standard]>=0.32.0",
-    "sqlalchemy>=2.0.0",
-    "aiosqlite>=0.20.0",
-    "redis>=5.0.0",
-    "aioredis>=2.0.0",
-    "pydantic>=2.0.0",
-    "python-dotenv>=1.0.0",
-    "python-multipart>=0.0.6",
+    "fastmcp>=2.14.0",
 ]
+
+[project.scripts]
+# 插件入口点
+claude-mem-client = "client.mcp_client:main"
 
 [project.optional-dependencies]
 dev = [
@@ -48,7 +45,9 @@ dev-dependencies = [
     "isort>=5.13.0",
     "mypy>=1.8.0",
 ]
-virtualenv = ".venv"
+
+[tool.hatch.build.targets.wheel]
+packages = ["server"]
 
 [tool.black]
 line-length = 88
