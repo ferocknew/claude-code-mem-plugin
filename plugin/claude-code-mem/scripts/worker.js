@@ -15,108 +15,10 @@ const HOST = process.env.CLAUDE_MEM_WORKER_HOST || '127.0.0.1';
 const DATA_DIR = path.join(os.homedir(), '.claude-code-mem');
 const MEMORY_FILE = path.join(DATA_DIR, 'mem.jsonl');
 const SESSION_FILE = path.join(DATA_DIR, 'current_session.json');
-const HEARTBEAT_FILE = path.join(DATA_DIR, 'heartbeat.txt');
-
-// 心跳检测配置
-const HEARTBEAT_CHECK_INTERVAL = 10000; // 10 秒检查一次
-const PARENT_PROCESS_CHECK = false; // 禁用父进程检测（使用心跳文件替代）
-
-// 记录启动时的父进程 PID
-const PARENT_PID = process.ppid;
 
 // 分析队列
 const analysisQueue = [];
 let isProcessing = false;
-
-// 心跳检测
-let heartbeatTimer = null;
-let lastHeartbeatCheck = Date.now();
-
-/**
- * 检查父进程是否还在运行（Claude Code / Cursor 进程）
- */
-function checkParentProcess() {
-  try {
-    // 尝试发送 signal 0 来检测进程是否存在
-    // signal 0 不会真正发送信号，只是检测进程是否存在
-    process.kill(PARENT_PID, 0);
-    return true; // 进程存在
-  } catch (error) {
-    if (error.code === 'ESRCH') {
-      // ESRCH: No such process - 父进程已退出
-      console.error('[Worker] Parent process (PID:', PARENT_PID, ') no longer exists');
-      return false;
-    } else if (error.code === 'EPERM') {
-      // EPERM: Operation not permitted - 进程存在但没有权限
-      return true;
-    }
-    // 其他错误，假设进程还在
-    console.error('[Worker] Error checking parent process:', error.message);
-    return true;
-  }
-}
-
-/**
- * 检查心跳文件（备用方案，检测长时间无操作）
- */
-function checkHeartbeat() {
-  try {
-    if (!fs.existsSync(HEARTBEAT_FILE)) {
-      // 没有心跳文件，可能刚启动，允许继续
-      return true;
-    }
-
-    const lastHeartbeat = parseInt(fs.readFileSync(HEARTBEAT_FILE, 'utf8'));
-    const now = Date.now();
-    const timeSinceLastHeartbeat = now - lastHeartbeat;
-    const maxIdleTime = 3600000; // 1 小时无操作则退出
-
-    if (timeSinceLastHeartbeat > maxIdleTime) {
-      console.error(`[Worker] No activity for ${Math.floor(timeSinceLastHeartbeat / 60000)} minutes, shutting down...`);
-      return false;
-    }
-
-    return true;
-  } catch (error) {
-    console.error('[Worker] Error checking heartbeat:', error.message);
-    return true; // 出错时保持运行
-  }
-}
-
-/**
- * 启动心跳检测定时器
- */
-function startHeartbeatMonitor() {
-  console.error(`[Worker] Starting process monitor (check every ${HEARTBEAT_CHECK_INTERVAL / 1000}s)`);
-  console.error(`[Worker] Parent process PID: ${PARENT_PID}`);
-
-  heartbeatTimer = setInterval(() => {
-    // 首先检查父进程是否还在（最可靠的方式）
-    if (PARENT_PROCESS_CHECK && !checkParentProcess()) {
-      console.error('[Worker] Claude Code has exited, shutting down...');
-      shutdown();
-      return;
-    }
-
-    // 备用检查：是否长时间无活动
-    if (!checkHeartbeat()) {
-      console.error('[Worker] No activity for too long, shutting down...');
-      shutdown();
-      return;
-    }
-  }, HEARTBEAT_CHECK_INTERVAL);
-}
-
-/**
- * 停止心跳检测
- */
-function stopHeartbeatMonitor() {
-  if (heartbeatTimer) {
-    clearInterval(heartbeatTimer);
-    heartbeatTimer = null;
-    console.error('[Worker] Heartbeat monitor stopped');
-  }
-}
 
 /**
  * 读取 JSONL 文件内容
@@ -441,20 +343,15 @@ server.listen(PORT, HOST, () => {
   console.error(`⚙️  Analysis API:   http://${HOST}:${PORT}/api/analyze`);
   console.error('='.repeat(60));
   console.error(`📁 Memory file:    ${MEMORY_FILE}`);
+  console.error(`🔄 Worker will keep running until manually restarted`);
   console.error('='.repeat(60));
-
-  // 启动心跳监控
-  startHeartbeatMonitor();
 });
 
 /**
- * 优雅关闭
+ * 优雅关闭（仅在收到 SIGTERM/SIGINT 时）
  */
 function shutdown() {
-  console.error('[Worker] Shutting down...');
-
-  // 停止心跳监控
-  stopHeartbeatMonitor();
+  console.error('[Worker] Received shutdown signal, closing server...');
 
   server.close(() => {
     console.error('[Worker] Server closed');
@@ -468,15 +365,17 @@ function shutdown() {
   }, 5000);
 }
 
+// 仅响应明确的停止信号
 process.on('SIGTERM', shutdown);
 process.on('SIGINT', shutdown);
 
-// 未捕获的异常
+// 未捕获的异常 - 记录但不退出
 process.on('uncaughtException', (error) => {
   console.error('[Worker] Uncaught exception:', error);
-  shutdown();
+  console.error('[Worker] Worker will continue running...');
 });
 
 process.on('unhandledRejection', (reason, promise) => {
   console.error('[Worker] Unhandled rejection at:', promise, 'reason:', reason);
+  console.error('[Worker] Worker will continue running...');
 });
