@@ -11,7 +11,7 @@
   "worker_port": 57777,
   "worker_host": "127.0.0.1",
   "mem_jsonl": "",
-  "min_score_threshold": 30,
+  "min_score_threshold": 20,
   "description": {
     "enabled": "是否启用记忆注入",
     "max_entities": "最多注入几个实体",
