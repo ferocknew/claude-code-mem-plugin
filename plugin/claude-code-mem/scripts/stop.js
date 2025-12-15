@@ -17,6 +17,22 @@ const WORKER_PORT = process.env.CLAUDE_MEM_WORKER_PORT || 57777;
 const WORKER_HOST = process.env.CLAUDE_MEM_WORKER_HOST || '127.0.0.1';
 
 /**
+ * 获取本地时间字符串
+ */
+function getLocalTimestamp() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  const seconds = String(now.getSeconds()).padStart(2, '0');
+  const ms = String(now.getMilliseconds()).padStart(3, '0');
+  
+  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}.${ms}`;
+}
+
+/**
  * 获取当前项目名称
  */
 function getProjectName() {
@@ -35,7 +51,7 @@ if (!fs.existsSync(DATA_DIR)) {
 
 // 调试日志
 function debugLog(message, data = null) {
-  const timestamp = new Date().toISOString();
+  const timestamp = getLocalTimestamp();
   const logEntry = {
     timestamp,
     message,
@@ -75,7 +91,7 @@ if (assistantResponse) {
       type: 'assistant_message',
       project: getProjectName(),
       content: assistantResponse,
-      timestamp: new Date().toISOString(),
+      timestamp: getLocalTimestamp(),
     };
 
     fs.appendFileSync(MEMORY_FILE, JSON.stringify(record) + '\n', 'utf8');
@@ -230,7 +246,7 @@ function analyzeLocally(sessionData) {
           learned: analysis.learned || '',
           completed: analysis.completed || '',
           next_steps: analysis.next_steps || '',
-          timestamp: new Date().toISOString(),
+          timestamp: getLocalTimestamp(),
           message_count: sessionData.length,
           analyzed_by: 'local',
         };
@@ -250,7 +266,7 @@ function analyzeLocally(sessionData) {
               insight: obs.insight,
               concepts: obs.concepts || [],
               files: obs.files || [],
-              timestamp: new Date().toISOString(),
+              timestamp: getLocalTimestamp(),
             };
             fs.appendFileSync(MEMORY_FILE, JSON.stringify(obsRecord) + '\n', 'utf8');
           }

@@ -13,9 +13,25 @@ const GRAPH_FILE = path.join(DATA_DIR, 'knowledge_graph.jsonl');
 const CONFIG_FILE = path.join(path.dirname(__filename), '..', 'memory_config.json');
 const LOG_FILE = path.join(DATA_DIR, 'injection_debug.log');
 
+/**
+ * 获取本地时间字符串
+ */
+function getLocalTimestamp() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  const seconds = String(now.getSeconds()).padStart(2, '0');
+  const ms = String(now.getMilliseconds()).padStart(3, '0');
+  
+  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}.${ms}`;
+}
+
 // 日志函数
 function log(message) {
-  const timestamp = new Date().toISOString();
+  const timestamp = getLocalTimestamp();
   const logMessage = `[${timestamp}] ${message}\n`;
 
   try {

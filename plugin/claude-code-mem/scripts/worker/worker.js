@@ -16,6 +16,22 @@ const DATA_DIR = path.join(os.homedir(), '.claude-code-mem');
 const MEMORY_FILE = path.join(DATA_DIR, 'mem.jsonl');
 const SESSION_FILE = path.join(DATA_DIR, 'current_session.json');
 
+/**
+ * 获取本地时间字符串
+ */
+function getLocalTimestamp() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  const seconds = String(now.getSeconds()).padStart(2, '0');
+  const ms = String(now.getMilliseconds()).padStart(3, '0');
+  
+  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}.${ms}`;
+}
+
 // 分析队列
 const analysisQueue = [];
 let isProcessing = false;
@@ -122,7 +138,7 @@ function saveAnalysisResult(analysis, sessionData) {
       learned: analysis.learned || '',
       completed: analysis.completed || '',
       next_steps: analysis.next_steps || '',
-      timestamp: new Date().toISOString(),
+      timestamp: getLocalTimestamp(),
       message_count: sessionData.length,
       analyzed_by: 'worker',
       model_used: analysis.model_used,
@@ -142,7 +158,7 @@ function saveAnalysisResult(analysis, sessionData) {
           insight: obs.insight,
           concepts: obs.concepts || [],
           files: obs.files || [],
-          timestamp: new Date().toISOString(),
+          timestamp: getLocalTimestamp(),
         };
         fs.appendFileSync(MEMORY_FILE, JSON.stringify(obsRecord) + '\n', 'utf8');
       }

@@ -13,6 +13,22 @@ const SESSION_FILE = path.join(DATA_DIR, 'current_session.json');
 const HEARTBEAT_FILE = path.join(DATA_DIR, 'heartbeat.txt');
 
 /**
+ * 获取本地时间字符串
+ */
+function getLocalTimestamp() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  const seconds = String(now.getSeconds()).padStart(2, '0');
+  const ms = String(now.getMilliseconds()).padStart(3, '0');
+  
+  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}.${ms}`;
+}
+
+/**
  * 获取当前项目名称
  */
 function getProjectName() {
@@ -49,7 +65,7 @@ process.stdin.on('end', () => {
         type: 'user_message',
         project: getProjectName(),
         content: userInput,
-        timestamp: new Date().toISOString(),
+        timestamp: getLocalTimestamp(),
       };
 
       // 记录到主文件
