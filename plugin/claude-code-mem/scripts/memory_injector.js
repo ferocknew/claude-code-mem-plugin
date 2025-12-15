@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 /**
- * 增强版记忆注入器 - 带日志记录
- * 在原有基础上添加文件日志功能
+ * 增强版记忆注入器 - 带日志记录和 LLM 关键词提取
+ * 在原有基础上添加文件日志功能和智能关键词提取
  */
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const https = require('https');
 
 const DATA_DIR = path.join(os.homedir(), '.claude-code-mem');
 const GRAPH_FILE = path.join(DATA_DIR, 'knowledge_graph.jsonl');
@@ -33,7 +34,9 @@ const DEFAULT_CONFIG = {
   max_entities: 5,
   injection_mode: 'auto',
   show_marker: true,
-  debug: true
+  debug: true,
+  use_llm_keywords: true, // 是否使用 LLM 提取关键词
+  llm_keywords_timeout: 3000 // LLM 提取超时时间(毫秒)
 };
 
 /**
@@ -53,7 +56,7 @@ function loadConfig() {
 /**
  * 搜索知识图谱
  */
-function searchKnowledgeGraph(userInput, config) {
+async function searchKnowledgeGraph(userInput, config) {
   if (!fs.existsSync(GRAPH_FILE)) {
     log('📁 Knowledge graph not found');
     return { entities: [], relations: [] };
@@ -76,18 +79,23 @@ function searchKnowledgeGraph(userInput, config) {
     }
   }
 
-  log(`📊 Graph loaded: ${entities.length} entities, ${relations.length} relations`);
+  log(`\n📊 [知识图谱加载]`);
+  log(`   实体数量: ${entities.length}`);
+  log(`   关系数量: ${relations.length}`);
 
-  // 提取关键词
-  const keywords = extractKeywords(userInput);
-  log(`🔍 Keywords extracted: [${keywords.join(', ')}]`);
+  // 提取关键词（支持 LLM）
+  const keywords = await extractKeywords(userInput, config);
 
   if (keywords.length === 0) {
-    log('⚠️  No keywords found');
+    log('\n⚠️  未提取到关键词');
     return { entities: [], relations: [] };
   }
 
   // 搜索相关实体
+  log(`\n🔎 [实体匹配]`);
+  log(`   关键词: [${keywords.join(', ')}]`);
+  log(`   开始匹配...`);
+  
   const scoredEntities = [];
   for (const entity of entities) {
     let score = 0;
@@ -136,11 +144,15 @@ function searchKnowledgeGraph(userInput, config) {
   const relevantEntities = topEntities.map(s => s.entity);
 
   // 详细日志：显示匹配的实体及得分
-  log(`\n📋 匹配实体详情 (最多 ${maxEntities} 个):`);
-  topEntities.forEach((item, idx) => {
-    log(`  ${idx + 1}. [${item.score}分] ${item.entity.name} (${item.entity.entityType})`);
-    log(`     原因: ${item.matchReasons.join(', ')}`);
-  });
+  log(`\n📋 [匹配结果] (最多 ${maxEntities} 个):`);
+  if (topEntities.length === 0) {
+    log(`   无匹配实体`);
+  } else {
+    topEntities.forEach((item, idx) => {
+      log(`   ${idx + 1}. [${item.score}分] ${item.entity.name} (${item.entity.entityType})`);
+      log(`      原因: ${item.matchReasons.join(', ')}`);
+    });
+  }
 
   const entityNames = new Set(relevantEntities.map(e => e.name));
   const relevantRelations = relations.filter(
@@ -148,12 +160,14 @@ function searchKnowledgeGraph(userInput, config) {
   );
 
   const maxRelations = Math.min(relevantRelations.length, 5);
-  log(`\n✅ Found: ${relevantEntities.length} entities, ${maxRelations} relations`);
+  log(`\n✅ [查询完成]`);
+  log(`   匹配实体: ${relevantEntities.length} 个`);
+  log(`   相关关系: ${maxRelations} 个`);
 
   if (relevantRelations.length > 0) {
-    log(`\n🔗 关系详情:`);
+    log(`\n🔗 [关系详情]:`);
     relevantRelations.slice(0, 5).forEach((rel, idx) => {
-      log(`  ${idx + 1}. ${rel.from} --[${rel.relationType}]--> ${rel.to}`);
+      log(`   ${idx + 1}. ${rel.from} --[${rel.relationType}]--> ${rel.to}`);
     });
   }
 
@@ -164,9 +178,170 @@ function searchKnowledgeGraph(userInput, config) {
 }
 
 /**
- * 提取关键词
+ * 获取 API 配置
  */
-function extractKeywords(text) {
+function getApiConfig() {
+  const authToken = process.env.ANTHROPIC_AUTH_TOKEN;
+  const baseUrl = process.env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com';
+  const defaultModel = process.env.ANTHROPIC_DEFAULT_HAIKU_MODEL || 'glm-4.5-air';
+
+  if (authToken) {
+    return {
+      apiKey: authToken,
+      baseUrl: baseUrl,
+      model: defaultModel,
+      source: 'claude_code'
+    };
+  }
+
+  const apiKey = process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY;
+  if (apiKey) {
+    return {
+      apiKey: apiKey,
+      baseUrl: 'https://api.anthropic.com',
+      model: 'claude-haiku-4',
+      source: 'user_config'
+    };
+  }
+
+  return null;
+}
+
+/**
+ * 调用 Claude API 提取关键词
+ */
+async function callClaudeAPI(prompt, config, timeout = 5000) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error('API request timeout'));
+    }, timeout);
+
+    const data = JSON.stringify({
+      model: config.model,
+      max_tokens: 500,
+      messages: [
+        {
+          role: 'user',
+          content: prompt,
+        },
+      ],
+    });
+
+    const url = new URL(config.baseUrl + '/v1/messages');
+
+    const headers = {
+      'Content-Type': 'application/json',
+      'Content-Length': Buffer.byteLength(data),
+    };
+
+    if (config.baseUrl.includes('bigmodel.cn')) {
+      headers['Authorization'] = `Bearer ${config.apiKey}`;
+    } else {
+      headers['x-api-key'] = config.apiKey;
+      headers['anthropic-version'] = '2023-06-01';
+    }
+
+    const options = {
+      hostname: url.hostname,
+      port: url.port || 443,
+      path: url.pathname,
+      method: 'POST',
+      headers: headers,
+      rejectUnauthorized: !config.baseUrl.includes('bigmodel.cn'),
+    };
+
+    const req = https.request(options, (res) => {
+      let responseData = '';
+
+      res.on('data', (chunk) => {
+        responseData += chunk;
+      });
+
+      res.on('end', () => {
+        clearTimeout(timer);
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          try {
+            const parsed = JSON.parse(responseData);
+            resolve(parsed);
+          } catch (error) {
+            reject(new Error(`Failed to parse API response: ${error.message}`));
+          }
+        } else {
+          reject(new Error(`API request failed with status ${res.statusCode}: ${responseData}`));
+        }
+      });
+    });
+
+    req.on('error', (error) => {
+      clearTimeout(timer);
+      reject(new Error(`API request error: ${error.message}`));
+    });
+
+    req.write(data);
+    req.end();
+  });
+}
+
+/**
+ * 使用 LLM 提取关键词和概念
+ */
+async function extractKeywordsWithLLM(text, config) {
+  const prompt = `分析以下用户输入，提取关键的技术概念、实体名称和主题词。
+
+用户输入:
+${text}
+
+请以 JSON 数组格式返回关键词列表，按重要性排序。只返回 JSON 数组，不要其他文字。
+
+示例格式:
+["关键词1", "关键词2", "关键词3"]
+
+要求:
+- 提取技术术语、文件名、功能名称、概念等
+- 忽略常见停用词
+- 最多返回 10 个关键词
+- 关键词应该是单个词或短语`;
+
+  try {
+    log(`\n🤖 [LLM 关键词提取]`);
+    log(`   模型: ${config.model}`);
+    log(`   来源: ${config.source}`);
+    log(`   超时: ${config.timeout}ms`);
+    log(`   提示词长度: ${prompt.length} 字符`);
+    
+    const startTime = Date.now();
+    const response = await callClaudeAPI(prompt, config, config.timeout || 3000);
+    const elapsed = Date.now() - startTime;
+    
+    const content = response.content[0].text;
+    log(`   响应时间: ${elapsed}ms`);
+    log(`   原始响应: ${content}`);
+
+    // 提取 JSON 数组
+    const jsonMatch = content.match(/\[[\s\S]*?\]/);
+    if (!jsonMatch) {
+      log('   ⚠️  未找到 JSON 数组，回退到简单提取');
+      return null;
+    }
+
+    const keywords = JSON.parse(jsonMatch[0]);
+    if (Array.isArray(keywords) && keywords.length > 0) {
+      log(`   ✅ 成功提取: [${keywords.join(', ')}]`);
+      return keywords;
+    }
+
+    return null;
+  } catch (error) {
+    log(`   ❌ LLM 提取失败: ${error.message}`);
+    log(`   回退到简单提取`);
+    return null;
+  }
+}
+
+/**
+ * 简单关键词提取（回退方案）
+ */
+function extractKeywordsSimple(text) {
   const stopWords = ['的', '了', '是', '在', '我', '有', '和', '就', '不', '人', '都', '一', '个', '上', '也', '很', '到', '说', '要', '去', '你', '会', '着', '没有', '看', '好', '自己', '这', '什么', '怎么', '为什么', '如何'];
 
   const words = text
@@ -176,6 +351,41 @@ function extractKeywords(text) {
     .filter(word => word.length >= 2 && !stopWords.includes(word));
 
   return [...new Set(words)];
+}
+
+/**
+ * 提取关键词（智能模式）
+ */
+async function extractKeywords(text, config) {
+  log(`\n🔍 [关键词提取]`);
+  log(`   输入文本: ${text.substring(0, 100)}${text.length > 100 ? '...' : ''}`);
+  log(`   启用 LLM: ${config.use_llm_keywords}`);
+  
+  // 如果启用 LLM 且有 API 配置，尝试使用 LLM
+  if (config.use_llm_keywords) {
+    const apiConfig = getApiConfig();
+    if (apiConfig) {
+      log(`   API 配置: 已找到 (${apiConfig.source})`);
+      const llmKeywords = await extractKeywordsWithLLM(text, {
+        ...apiConfig,
+        timeout: config.llm_keywords_timeout
+      });
+      if (llmKeywords) {
+        log(`   提取方式: ✅ LLM`);
+        return llmKeywords;
+      }
+    } else {
+      log(`   API 配置: ❌ 未找到`);
+      log(`   提取方式: 📝 简单模式（回退）`);
+    }
+  } else {
+    log(`   提取方式: 📝 简单模式（配置禁用）`);
+  }
+
+  // 回退到简单提取
+  const simpleKeywords = extractKeywordsSimple(text);
+  log(`   简单提取结果: [${simpleKeywords.join(', ')}]`);
+  return simpleKeywords;
 }
 
 /**
@@ -233,15 +443,22 @@ process.stdin.on('data', (chunk) => {
   inputData += chunk;
 });
 
-process.stdin.on('end', () => {
+process.stdin.on('end', async () => {
   try {
-    log('🚀 Memory injection started');
+    log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    log('🚀 [记忆注入开始]');
+    log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
     const config = loadConfig();
-    log(`⚙️  Config: enabled=${config.enabled}, show_marker=${config.show_marker}`);
+    log(`\n⚙️  [配置信息]`);
+    log(`   启用状态: ${config.enabled}`);
+    log(`   使用 LLM: ${config.use_llm_keywords}`);
+    log(`   显示标记: ${config.show_marker}`);
+    log(`   最大实体: ${config.max_entities}`);
+    log(`   LLM 超时: ${config.llm_keywords_timeout}ms`);
 
     if (!config.enabled) {
-      log('❌ Memory injection disabled');
+      log('\n❌ 记忆注入已禁用');
       console.log(inputData);
       return;
     }
@@ -249,29 +466,38 @@ process.stdin.on('end', () => {
     const data = JSON.parse(inputData);
     const userInput = data.prompt || data.content || '';
 
-    log(`📝 User input: ${userInput.substring(0, 50)}...`);
+    log(`\n📝 [用户输入]`);
+    log(`   长度: ${userInput.length} 字符`);
+    log(`   内容: ${userInput.substring(0, 100)}${userInput.length > 100 ? '...' : ''}`);
 
     if (!userInput) {
-      log('⚠️  Empty input');
+      log('\n⚠️  输入为空');
       console.log(inputData);
       return;
     }
 
-    const memoryData = searchKnowledgeGraph(userInput, config);
+    const memoryData = await searchKnowledgeGraph(userInput, config);
 
     let enhancedPrompt = userInput;
     if (memoryData.entities.length > 0) {
       const memoryContext = formatMemoryContext(memoryData, config);
       enhancedPrompt = memoryContext + userInput;
 
-      log(`\n🧠 Memory injected: ${memoryData.entities.length} entities, ${memoryData.relations.length} relations`);
+      log(`\n🧠 [记忆注入]`);
+      log(`   注入实体: ${memoryData.entities.length} 个`);
+      log(`   注入关系: ${memoryData.relations.length} 个`);
+      log(`   注入内容长度: ${memoryContext.length} 字符`);
 
       // 显示注入内容预览
-      log(`\n📄 注入内容预览 (前300字符):`);
-      const preview = memoryContext.substring(0, 300).replace(/\n/g, '\n   ');
-      log(`   ${preview}...`);
+      log(`\n📄 [注入内容预览] (前 500 字符):`);
+      const preview = memoryContext.substring(0, 500).split('\n').map(line => `   ${line}`).join('\n');
+      log(preview);
+      if (memoryContext.length > 500) {
+        log(`   ... (还有 ${memoryContext.length - 500} 字符)`);
+      }
     } else {
-      log('🔍 No relevant memory found');
+      log(`\n🔍 [记忆注入]`);
+      log(`   未找到相关记忆，不注入内容`);
     }
 
     const output = {
@@ -281,9 +507,13 @@ process.stdin.on('end', () => {
     };
 
     console.log(JSON.stringify(output));
-    log('✅ Memory injection completed');
+    
+    log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    log('✅ [记忆注入完成]');
+    log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   } catch (error) {
-    log(`❌ Error: ${error.message}`);
+    log(`\n❌ [错误] ${error.message}`);
+    log(`   堆栈: ${error.stack}`);
     console.log(inputData);
   }
 });

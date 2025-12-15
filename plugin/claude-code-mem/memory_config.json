@@ -4,11 +4,15 @@
   "injection_mode": "auto",
   "show_marker": true,
   "debug": true,
+  "use_llm_keywords": true,
+  "llm_keywords_timeout": 3000,
   "description": {
     "enabled": "是否启用记忆注入",
     "max_entities": "最多注入几个实体",
     "injection_mode": "注入模式: auto(自动), always(总是), manual(手动)",
     "show_marker": "是否显示 🧠 标记(方便验证插件是否工作)",
-    "debug": "是否显示调试信息"
+    "debug": "是否显示调试信息",
+    "use_llm_keywords": "是否使用 LLM 智能提取关键词(需要 API Key)",
+    "llm_keywords_timeout": "LLM 关键词提取超时时间(毫秒)，超时后回退到简单提取"
   }
 }
