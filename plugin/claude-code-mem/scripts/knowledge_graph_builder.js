@@ -15,6 +15,9 @@ const GRAPH_FILE = path.join(DATA_DIR, 'knowledge_graph.jsonl');
  * 从 session_summary 提取实体
  */
 function extractEntitiesFromSummary(summary) {
+  console.error('=== 提取会话摘要实体 ===');
+  console.error('Summary data:', JSON.stringify(summary, null, 2));
+  
   const entities = [];
   const relations = [];
 
@@ -35,6 +38,7 @@ function extractEntitiesFromSummary(summary) {
     timestamp: summary.timestamp
   };
 
+  console.error('Created session entity:', JSON.stringify(sessionEntity, null, 2));
   entities.push(sessionEntity);
 
   // 简单的关键词提取 (可以用 LLM 增强)
@@ -72,6 +76,9 @@ function extractEntitiesFromSummary(summary) {
  * 从 observation 提取实体
  */
 function extractEntitiesFromObservation(observation) {
+  console.error('=== 提取观察实体 ===');
+  console.error('Observation data:', JSON.stringify(observation, null, 2));
+  
   const entities = [];
   const relations = [];
 
@@ -90,6 +97,7 @@ function extractEntitiesFromObservation(observation) {
     timestamp: observation.timestamp
   };
 
+  console.error('Created observation entity:', JSON.stringify(obsEntity, null, 2));
   entities.push(obsEntity);
 
   // 为涉及的文件创建实体和关系
@@ -148,6 +156,10 @@ function extractKeywordsSimple(text) {
  * 构建知识图谱
  */
 function buildKnowledgeGraph() {
+  console.error('=== 开始构建知识图谱 ===');
+  console.error('Memory file path:', MEMORY_FILE);
+  console.error('Graph file path:', GRAPH_FILE);
+  
   if (!fs.existsSync(MEMORY_FILE)) {
     console.error('❌ Memory file not found');
     return;
@@ -158,10 +170,12 @@ function buildKnowledgeGraph() {
   const allRelations = [];
 
   console.error(`📊 Processing ${lines.length} records...`);
+  console.error('=== 开始处理记录 ===');
 
   for (const line of lines) {
     try {
       const record = JSON.parse(line);
+      console.error(`\n处理记录类型: ${record.type}`);
 
       let result;
       if (record.type === 'session_summary') {
@@ -169,8 +183,11 @@ function buildKnowledgeGraph() {
       } else if (record.type === 'observation') {
         result = extractEntitiesFromObservation(record);
       } else {
+        console.error(`跳过记录类型: ${record.type}`);
         continue;
       }
+      
+      console.error(`提取结果: ${result.entities.length} 个实体, ${result.relations.length} 个关系`);
 
       // 合并实体 (同名实体的 observations 合并)
       for (const entity of result.entities) {

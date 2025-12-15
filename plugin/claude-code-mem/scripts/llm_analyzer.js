@@ -4,6 +4,52 @@
  * 提取观察(observations)和生成总结
  */
 const https = require('https');
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
+
+const DATA_DIR = path.join(os.homedir(), '.claude-code-mem');
+const LOG_FILE = path.join(DATA_DIR, 'injection_debug.log');
+
+/**
+ * 获取本地时间字符串
+ */
+function getLocalTimestamp() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  const seconds = String(now.getSeconds()).padStart(2, '0');
+  const ms = String(now.getMilliseconds()).padStart(3, '0');
+  
+  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}.${ms}`;
+}
+
+/**
+ * 日志函数
+ */
+function log(message, data = null) {
+  const timestamp = getLocalTimestamp();
+  const logEntry = {
+    timestamp,
+    source: 'llm_analyzer',
+    message,
+    data,
+  };
+  
+  try {
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+    fs.appendFileSync(LOG_FILE, JSON.stringify(logEntry) + '\n', 'utf8');
+  } catch (e) {
+    // 忽略日志错误
+  }
+  
+  console.error(`[Analyzer] ${message}`);
+}
 
 // 观察类型定义
 const OBSERVATION_TYPES = ['bugfix', 'feature', 'refactor', 'discovery', 'decision', 'change'];
@@ -30,6 +76,7 @@ function getApiConfig() {
 
   // 如果有 auth token，优先使用
   if (authToken) {
+    log('API config found', { source: 'claude_code', model: defaultModel, baseUrl });
     return {
       apiKey: authToken,
       baseUrl: baseUrl,
@@ -41,6 +88,7 @@ function getApiConfig() {
   // 回退到用户配置的 API Key
   const apiKey = process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY;
   if (apiKey) {
+    log('API config found', { source: 'user_config', model: 'claude-haiku-4' });
     return {
       apiKey: apiKey,
       baseUrl: 'https://api.anthropic.com',
@@ -49,6 +97,10 @@ function getApiConfig() {
     };
   }
 
+  log('No API Key found', { 
+    checked_vars: ['ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_API_KEY', 'CLAUDE_API_KEY'],
+    all_env_keys: Object.keys(process.env).filter(k => k.includes('ANTHROPIC') || k.includes('CLAUDE'))
+  });
   console.error('❌ No API Key found. Please set ANTHROPIC_API_KEY or ensure Claude Code auth is configured');
   return null;
 }
@@ -57,6 +109,12 @@ function getApiConfig() {
  * 调用 Claude API(支持自定义 base URL,包括智谱AI)
  */
 async function callClaudeAPI(prompt, config) {
+  log('Calling Claude API', { 
+    model: config.model, 
+    baseUrl: config.baseUrl,
+    promptLength: prompt.length 
+  });
+  
   return new Promise((resolve, reject) => {
     const data = JSON.stringify({
       model: config.model,
@@ -177,38 +235,42 @@ ${conversationText}
  * 生成会话总结 - 类似截图格式的综合分析
  */
 async function generateSessionSummary(conversationText, config) {
-  const prompt = `请分析以下会话内容，生成一个结构化的会话总结。类似会话摘要卡片的格式。
+  const prompt = `请分析以下会话内容，生成一个结构化的会话总结。
 
 ${conversationText}
 
-请以 JSON 格式返回，包含以下字段：
+请以 JSON 格式返回，包含以下字段（所有内容必须用中文，简明概要！）：
 
-1. **investigated** (🔍 调查内容): 用户询问或请求了什么？尝试解决什么问题？(2-3句话)
-2. **learned** (💡 学到什么): 从这次对话中获得的关键知识点或发现(2-3句话)
-3. **completed** (✅ 完成内容): 实际完成了什么？有哪些具体成果？根据工具执行历史推测(2-3句话)
-4. **next_steps** (➡️ 后续步骤): 建议的后续行动或待办事项(可选，1-2句话)
+1. **investigated** (🔍 调查内容): 用户询问或请求了什么？尝试解决什么问题？(2-3句中文描述)
+2. **learned** (💡 学到什么): 从这次对话中获得的关键知识点或发现(2-3句中文描述)
+3. **completed** (✅ 完成内容): 实际完成了什么？有哪些具体成果？根据工具执行历史推测(2-3句中文描述)
+4. **next_steps** (➡️ 后续步骤): 建议的后续行动或待办事项(可选，1-2句中文描述)
 5. **observations** (数组): 技术观察列表，每个包含:
    - type: 观察类型(${OBSERVATION_TYPES.join(', ')})
-   - title: 简短标题(最多30字符)
-   - insight: 关键洞察(1-2句话)
+   - title: 简短的中文标题(最多30字符)
+   - insight: 关键洞察的中文描述(1-2句话)
    - concepts: 相关概念(从 ${CONCEPT_TAGS.join(', ')} 中选择)
-   - files: 相关文件(如果有)
+   - files: 相关文件路径(如果有)
 
-注意：如果没有助手响应，可以基于用户请求和工具执行历史来推测完成的工作。
+重要要求：
+- 所有文本内容必须使用简体中文
+- 描述要具体、清晰、专业
+- 如果没有助手响应，基于用户请求和工具执行历史推测完成的工作
+- 只返回 JSON 对象，不要其他文字
 
-只返回 JSON 对象，不要其他文字。格式示例:
+格式示例:
 {
-  "investigated": "用户尝试解决内存泄漏问题...",
-  "learned": "学习了 WeakMap 的使用方式和垃圾回收机制...",
-  "completed": "成功定位并修复了内存泄漏，性能提升明显...",
-  "next_steps": "建议添加内存监控和单元测试",
+  "investigated": "用户想要了解 web 订单管理页面的结构和实现方式，需要查看相关代码文件。",
+  "learned": "订单管理模块使用 React 和 Ant Design 实现，包含主逻辑文件 main.ts 和 UI 文件 index.tsx，支持筛选、分页等功能。",
+  "completed": "完成了订单管理模块的结构分析，识别了所有关键文件、组件、数据流和用户界面特性。系统提供了 15+ 个数据字段。",
+  "next_steps": "用户请求查看订单管理页面，已成功记录详细的结构和功能信息。",
   "observations": [
     {
-      "type": "bugfix",
-      "title": "修复循环闭包内存泄漏",
-      "insight": "使用 WeakMap 替代 Map 解决引用持有问题",
-      "concepts": ["problem-solution", "gotcha"],
-      "files": ["src/cache.js"]
+      "type": "feature",
+      "title": "订单管理模块架构",
+      "insight": "使用 React 模块化设计，main.ts 包含业务逻辑，index.tsx 提供 UI，通过 URL 参数实现跨页面导航。",
+      "concepts": ["pattern", "how-it-works"],
+      "files": ["web/src/pages/order_management/main.ts", "web/src/pages/order_management/index.tsx"]
     }
   ]
 }`;
@@ -268,6 +330,11 @@ async function analyzeSession(sessionData) {
     console.error('⚠️  No user messages to analyze');
     return null;
   }
+  
+  // 如果没有助手响应，记录警告但继续分析
+  if (assistantMessages.length === 0) {
+    console.error('⚠️  No assistant messages found, will analyze based on user request and tool executions');
+  }
 
   // 构建对话文本
   let conversationText = '=== 用户请求 ===\n';
@@ -277,12 +344,15 @@ async function analyzeSession(sessionData) {
 
   // 如果有助手响应，添加助手响应
   if (assistantMessages.length > 0) {
-  conversationText += '\n=== 助手响应摘要 ===\n';
-  const recentResponses = assistantMessages.slice(-3);
-  recentResponses.forEach((msg, i) => {
-    const truncated = msg.length > 500 ? msg.substring(0, 500) + '...' : msg;
-    conversationText += `${i + 1}. ${truncated}\n`;
-  });
+    conversationText += '\n=== 助手响应摘要 ===\n';
+    const recentResponses = assistantMessages.slice(-3);
+    recentResponses.forEach((msg, i) => {
+      const truncated = msg.length > 500 ? msg.substring(0, 500) + '...' : msg;
+      conversationText += `${i + 1}. ${truncated}\n`;
+    });
+  } else {
+    conversationText += '\n=== 助手响应 ===\n';
+    conversationText += '(无助手响应，请基于用户请求和工具执行推测完成的工作)\n';
   }
 
   // 添加工具执行历史（帮助理解上下文）
