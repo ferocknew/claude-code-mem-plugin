@@ -33,9 +33,18 @@ function getLocalTimestamp() {
  */
 function getProjectName() {
   try {
-    const projectPath = process.env.CLAUDE_WORKSPACE_PATH || process.cwd();
-    return path.basename(projectPath);
+    const projectPath = process.env.CLAUDE_PROJECT_DIR || process.cwd();
+    const projectName = path.basename(projectPath);
+    
+    debugLog('Project detection', {
+      CLAUDE_PROJECT_DIR: process.env.CLAUDE_PROJECT_DIR,
+      cwd: process.cwd(),
+      projectName: projectName
+    });
+    
+    return projectName;
   } catch (error) {
+    debugLog('Project detection error', { error: error.message });
     return null;
   }
 }
@@ -82,20 +91,6 @@ async function analyzeSessionData() {
       types: sessionData.map(r => r.type),
     });
 
-    // 详细打印每条消息的内容
-    debugLog('=== 详细会话数据 ===');
-    sessionData.forEach((record, index) => {
-      debugLog(`消息 ${index + 1}:`, {
-        type: record.type,
-        role: record.role,
-        content_length: record.content?.length || 0,
-        content_preview: record.content?.substring(0, 200) || '',
-        timestamp: record.timestamp,
-        all_fields: Object.keys(record),
-      });
-    });
-    debugLog('=== 会话数据结束 ===');
-
     // 会话太短，跳过（至少需要 1 条消息）
     if (sessionData.length < 1) {
       debugLog('Session too short, skipping analysis');
@@ -121,14 +116,6 @@ async function analyzeSessionData() {
 async function analyzeLocally(sessionData) {
   debugLog('Starting local analysis', { session_length: sessionData.length });
 
-  // 打印传递给分析器的完整数据
-  debugLog('=== 传递给 LLM 分析器的数据 ===');
-  debugLog('Session data for analyzer:', {
-    total_messages: sessionData.length,
-    full_data: sessionData,
-  });
-  debugLog('=== 分析器输入数据结束 ===');
-
   try {
     const { analyzeSession } = require('./llm_analyzer');
 
@@ -139,13 +126,10 @@ async function analyzeLocally(sessionData) {
       return;
     }
 
-    debugLog('=== LLM 分析结果 ===');
     debugLog('Analysis completed', {
       has_summary: !!analysis.investigated,
       observation_count: analysis.observations?.length || 0,
-      full_analysis: analysis,
     });
-    debugLog('=== 分析结果结束 ===');
 
     // 获取项目名称
     const projectName = getProjectName();
@@ -167,15 +151,7 @@ async function analyzeLocally(sessionData) {
     };
 
     fs.appendFileSync(MEMORY_FILE, JSON.stringify(summaryRecord) + '\n', 'utf8');
-    debugLog('Saved summary to file', { 
-      id: summaryRecord.id, 
-      project: projectName,
-      summary: {
-        investigated: summaryRecord.investigated.substring(0, 100),
-        learned: summaryRecord.learned.substring(0, 100),
-        completed: summaryRecord.completed.substring(0, 100),
-      }
-    });
+    debugLog('Saved summary', { id: summaryRecord.id, project: projectName });
 
     // 记录观察
     if (analysis.observations && analysis.observations.length > 0) {
@@ -192,12 +168,8 @@ async function analyzeLocally(sessionData) {
           timestamp: getLocalTimestamp(),
         };
         fs.appendFileSync(MEMORY_FILE, JSON.stringify(obsRecord) + '\n', 'utf8');
-        debugLog('Saved observation', { 
-          type: obs.type, 
-          title: obs.title 
-        });
       }
-      debugLog('Saved all observations', { count: analysis.observations.length });
+      debugLog('Saved observations', { count: analysis.observations.length });
     }
 
     // 清理会话文件
@@ -223,6 +195,15 @@ setImmediate(async () => {
   try {
     await analyzeSessionData();
     debugLog('Stop hook analysis completed');
+    
+    // 分析完成后，触发知识图谱增量更新
+    try {
+      const { buildKnowledgeGraphIncremental } = require('./knowledge_graph_builder');
+      await buildKnowledgeGraphIncremental();
+      debugLog('Knowledge graph updated');
+    } catch (kgError) {
+      debugLog('Knowledge graph update failed', { error: kgError.message });
+    }
   } catch (error) {
     debugLog('Stop hook analysis error', { error: error.message, stack: error.stack });
   }

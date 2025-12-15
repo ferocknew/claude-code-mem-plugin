@@ -52,7 +52,8 @@ const DEFAULT_CONFIG = {
   show_marker: true,
   debug: true,
   use_llm_keywords: true, // 是否使用 LLM 提取关键词
-  llm_keywords_timeout: 3000 // LLM 提取超时时间(毫秒)
+  llm_keywords_timeout: 3000, // LLM 提取超时时间(毫秒)
+  min_score_threshold: 30 // 最低评分阈值，低于此分数不注入
 };
 
 /**
@@ -74,9 +75,16 @@ function loadConfig() {
  */
 function getProjectName() {
   try {
-    const projectPath = process.env.CLAUDE_WORKSPACE_PATH || process.cwd();
-    return path.basename(projectPath);
+    const projectPath = process.env.CLAUDE_PROJECT_DIR || process.cwd();
+    const projectName = path.basename(projectPath);
+    
+    log(`\n🔍 [项目检测]`);
+    log(`   CLAUDE_PROJECT_DIR: ${process.env.CLAUDE_PROJECT_DIR || '(未设置)'}`);
+    log(`   项目名称: ${projectName}`);
+    
+    return projectName;
   } catch (error) {
+    log(`\n❌ [项目检测错误] ${error.message}`);
     return null;
   }
 }
@@ -180,15 +188,22 @@ async function searchKnowledgeGraph(userInput, config) {
 
   scoredEntities.sort((a, b) => b.score - a.score);
 
+  // 应用最低评分阈值
+  const minScore = config.min_score_threshold || 30;
+  const filteredEntities = scoredEntities.filter(s => s.score >= minScore);
+
   // 使用配置的最大实体数
   const maxEntities = config.max_entities || 5;
-  const topEntities = scoredEntities.slice(0, maxEntities);
+  const topEntities = filteredEntities.slice(0, maxEntities);
   const relevantEntities = topEntities.map(s => s.entity);
 
   // 详细日志：显示匹配的实体及得分
-  log(`\n📋 [匹配结果] (最多 ${maxEntities} 个):`);
-  if (topEntities.length === 0) {
+  log(`\n📋 [匹配结果] (最低 ${minScore} 分，最多 ${maxEntities} 个):`);
+  if (scoredEntities.length === 0) {
     log(`   无匹配实体`);
+  } else if (topEntities.length === 0) {
+    log(`   找到 ${scoredEntities.length} 个实体，但评分均低于阈值 ${minScore}`);
+    log(`   最高分: ${scoredEntities[0].score} 分 - ${scoredEntities[0].entity.name}`);
   } else {
     topEntities.forEach((item, idx) => {
       log(`   ${idx + 1}. [${item.score}分] ${item.entity.name} (${item.entity.entityType})`);

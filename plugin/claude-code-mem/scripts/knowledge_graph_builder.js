@@ -10,13 +10,46 @@ const os = require('os');
 const DATA_DIR = path.join(os.homedir(), '.claude-code-mem');
 const MEMORY_FILE = path.join(DATA_DIR, 'mem.jsonl');
 const GRAPH_FILE = path.join(DATA_DIR, 'knowledge_graph.jsonl');
+const LOG_FILE = path.join(DATA_DIR, 'injection_debug.log');
+
+/**
+ * 获取本地时间字符串
+ */
+function getLocalTimestamp() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  const seconds = String(now.getSeconds()).padStart(2, '0');
+  const ms = String(now.getMilliseconds()).padStart(3, '0');
+  
+  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}.${ms}`;
+}
+
+/**
+ * 日志函数
+ */
+function log(message) {
+  const timestamp = getLocalTimestamp();
+  const logMessage = `[${timestamp}] [KG] ${message}\n`;
+
+  try {
+    fs.appendFileSync(LOG_FILE, logMessage, 'utf8');
+  } catch (e) {
+    // 忽略日志错误
+  }
+
+  console.error(`[KG] ${message}`);
+}
 
 /**
  * 从 session_summary 提取实体
  */
 function extractEntitiesFromSummary(summary) {
-  console.error('=== 提取会话摘要实体 ===');
-  console.error('Summary data:', JSON.stringify(summary, null, 2));
+  log('=== 提取会话摘要实体 ===');
+  log(`Summary: ${JSON.stringify(summary, null, 2)}`);
   
   const entities = [];
   const relations = [];
@@ -38,7 +71,7 @@ function extractEntitiesFromSummary(summary) {
     timestamp: summary.timestamp
   };
 
-  console.error('Created session entity:', JSON.stringify(sessionEntity, null, 2));
+  log(`Created session entity: ${sessionEntity.name} (project: ${sessionEntity.project})`);
   entities.push(sessionEntity);
 
   // 简单的关键词提取 (可以用 LLM 增强)
@@ -76,8 +109,8 @@ function extractEntitiesFromSummary(summary) {
  * 从 observation 提取实体
  */
 function extractEntitiesFromObservation(observation) {
-  console.error('=== 提取观察实体 ===');
-  console.error('Observation data:', JSON.stringify(observation, null, 2));
+  log('=== 提取观察实体 ===');
+  log(`Observation: ${JSON.stringify(observation, null, 2)}`);
   
   const entities = [];
   const relations = [];
@@ -97,7 +130,7 @@ function extractEntitiesFromObservation(observation) {
     timestamp: observation.timestamp
   };
 
-  console.error('Created observation entity:', JSON.stringify(obsEntity, null, 2));
+  log(`Created observation entity: ${obsEntity.name} (project: ${obsEntity.project})`);
   entities.push(obsEntity);
 
   // 为涉及的文件创建实体和关系
@@ -153,15 +186,102 @@ function extractKeywordsSimple(text) {
 }
 
 /**
- * 构建知识图谱
+ * 增量构建知识图谱（只处理新增记录）
  */
-function buildKnowledgeGraph() {
-  console.error('=== 开始构建知识图谱 ===');
-  console.error('Memory file path:', MEMORY_FILE);
-  console.error('Graph file path:', GRAPH_FILE);
+async function buildKnowledgeGraphIncremental() {
+  log('🔨 [增量更新知识图谱]');
   
   if (!fs.existsSync(MEMORY_FILE)) {
-    console.error('❌ Memory file not found');
+    log('❌ Memory file not found');
+    return;
+  }
+
+  // 读取已处理的记录 ID
+  const processedIds = new Set();
+  if (fs.existsSync(GRAPH_FILE)) {
+    const graphLines = fs.readFileSync(GRAPH_FILE, 'utf8').split('\n').filter(Boolean);
+    for (const line of graphLines) {
+      try {
+        const item = JSON.parse(line);
+        if (item.type === 'entity' && item.name.startsWith('会话_')) {
+          // 从会话实体名称提取 ID
+          const id = item.name.replace('会话_', '');
+          processedIds.add(id);
+        }
+      } catch (e) {
+        // 忽略
+      }
+    }
+  }
+
+  log(`已处理 ${processedIds.size} 个会话`);
+
+  // 读取内存文件，找到未处理的记录
+  const lines = fs.readFileSync(MEMORY_FILE, 'utf8').split('\n').filter(Boolean);
+  const newRecords = [];
+
+  for (const line of lines) {
+    try {
+      const record = JSON.parse(line);
+      if ((record.type === 'session_summary' || record.type === 'observation') && 
+          !processedIds.has(record.id.substring(0, 8))) {
+        newRecords.push(record);
+      }
+    } catch (e) {
+      // 忽略
+    }
+  }
+
+  if (newRecords.length === 0) {
+    log('✅ 没有新记录需要处理');
+    return;
+  }
+
+  log(`📊 处理 ${newRecords.length} 条新记录...`);
+
+  const newEntities = [];
+  const newRelations = [];
+
+  for (const record of newRecords) {
+    let result;
+    if (record.type === 'session_summary') {
+      result = extractEntitiesFromSummary(record);
+    } else if (record.type === 'observation') {
+      result = extractEntitiesFromObservation(record);
+    } else {
+      continue;
+    }
+
+    newEntities.push(...result.entities);
+    newRelations.push(...result.relations);
+  }
+
+  // 追加到知识图谱文件
+  const graphData = [];
+  for (const entity of newEntities) {
+    graphData.push(JSON.stringify(entity));
+  }
+  for (const rel of newRelations) {
+    graphData.push(JSON.stringify(rel));
+  }
+
+  fs.appendFileSync(GRAPH_FILE, graphData.join('\n') + '\n', 'utf8');
+
+  log(`✅ 新增 ${newEntities.length} 个实体, ${newRelations.length} 个关系`);
+}
+
+/**
+ * 完整构建知识图谱（重建整个图谱）
+ */
+function buildKnowledgeGraph() {
+  log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  log('🔨 [完整构建知识图谱]');
+  log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  log(`Memory file: ${MEMORY_FILE}`);
+  log(`Graph file: ${GRAPH_FILE}`);
+  
+  if (!fs.existsSync(MEMORY_FILE)) {
+    log('❌ Memory file not found');
     return;
   }
 
@@ -169,13 +289,11 @@ function buildKnowledgeGraph() {
   const allEntities = new Map();
   const allRelations = [];
 
-  console.error(`📊 Processing ${lines.length} records...`);
-  console.error('=== 开始处理记录 ===');
+  log(`\n📊 Processing ${lines.length} records...`);
 
   for (const line of lines) {
     try {
       const record = JSON.parse(line);
-      console.error(`\n处理记录类型: ${record.type}`);
 
       let result;
       if (record.type === 'session_summary') {
@@ -183,11 +301,8 @@ function buildKnowledgeGraph() {
       } else if (record.type === 'observation') {
         result = extractEntitiesFromObservation(record);
       } else {
-        console.error(`跳过记录类型: ${record.type}`);
         continue;
       }
-      
-      console.error(`提取结果: ${result.entities.length} 个实体, ${result.relations.length} 个关系`);
 
       // 合并实体 (同名实体的 observations 合并)
       for (const entity of result.entities) {
@@ -227,18 +342,25 @@ function buildKnowledgeGraph() {
 
   fs.writeFileSync(GRAPH_FILE, graphData.join('\n') + '\n', 'utf8');
 
-  console.error(`✅ Knowledge graph built: ${allEntities.size} entities, ${uniqueRelations.size} relations`);
-  console.error(`📁 Saved to: ${GRAPH_FILE}`);
+  log(`\n✅ Knowledge graph built: ${allEntities.size} entities, ${uniqueRelations.size} relations`);
+  log(`📁 Saved to: ${GRAPH_FILE}`);
+  log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 }
 
 // 主程序
 if (require.main === module) {
   try {
-    buildKnowledgeGraph();
+    const args = process.argv.slice(2);
+    if (args.includes('--full')) {
+      buildKnowledgeGraph();
+    } else {
+      buildKnowledgeGraphIncremental();
+    }
   } catch (error) {
-    console.error(`❌ Error: ${error.message}`);
+    log(`❌ Error: ${error.message}`);
+    log(`Stack: ${error.stack}`);
     process.exit(1);
   }
 }
 
-module.exports = { buildKnowledgeGraph };
+module.exports = { buildKnowledgeGraph, buildKnowledgeGraphIncremental };

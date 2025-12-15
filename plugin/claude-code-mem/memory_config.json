@@ -11,6 +11,7 @@
   "worker_port": 57777,
   "worker_host": "127.0.0.1",
   "mem_jsonl": "",
+  "min_score_threshold": 30,
   "description": {
     "enabled": "是否启用记忆注入",
     "max_entities": "最多注入几个实体",
@@ -22,6 +23,7 @@
     "project_isolation": "是否只注入当前项目的记忆",
     "include_other_projects": "是否包含其他项目的记忆(当 project_isolation=true 时)",
     "worker_port": "Worker 服务端口",
-    "worker_host": "Worker 服务主机地址"
+    "worker_host": "Worker 服务主机地址",
+    "min_score_threshold": "最低评分阈值，低于此分数的记忆不会被注入(默认30分)"
   }
 }

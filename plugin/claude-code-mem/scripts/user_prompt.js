@@ -33,9 +33,14 @@ function getLocalTimestamp() {
  */
 function getProjectName() {
   try {
-    const projectPath = process.env.CLAUDE_WORKSPACE_PATH || process.cwd();
-    return path.basename(projectPath);
+    const projectPath = process.env.CLAUDE_PROJECT_DIR || process.cwd();
+    const projectName = path.basename(projectPath);
+    
+    console.error('[UserPrompt] Project:', projectName);
+    
+    return projectName;
   } catch (error) {
+    console.error('[UserPrompt] Project detection error:', error.message);
     return null;
   }
 }

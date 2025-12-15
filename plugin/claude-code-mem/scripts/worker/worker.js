@@ -100,16 +100,8 @@ function getStats() {
       }
     });
 
-    // 会话数 = session_start 事件数量
-    const sessionStarts = lines.filter(line => {
-      try {
-        const record = JSON.parse(line);
-        return record.type === 'session_event' && record.event === 'session_start';
-      } catch (error) {
-        return false;
-      }
-    });
-    stats.totalSessions = sessionStarts.length;
+    // 会话数 = session_summary 数量
+    stats.totalSessions = stats.by_type['session_summary'] || 0;
     stats.totalObservations = stats.by_type['observation'] || 0;
 
     return stats;
