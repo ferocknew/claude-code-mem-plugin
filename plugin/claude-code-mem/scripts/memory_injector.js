@@ -54,6 +54,18 @@ function loadConfig() {
 }
 
 /**
+ * 获取当前项目名称
+ */
+function getProjectName() {
+  try {
+    const projectPath = process.env.CLAUDE_WORKSPACE_PATH || process.cwd();
+    return path.basename(projectPath);
+  } catch (error) {
+    return null;
+  }
+}
+
+/**
  * 搜索知识图谱
  */
 async function searchKnowledgeGraph(userInput, config) {
@@ -66,9 +78,21 @@ async function searchKnowledgeGraph(userInput, config) {
   const entities = [];
   const relations = [];
 
+  const currentProject = getProjectName();
+
   for (const line of lines) {
     try {
       const item = JSON.parse(line);
+      
+      // 项目隔离过滤
+      if (config.project_isolation && item.project) {
+        if (item.project !== currentProject) {
+          if (!config.include_other_projects) {
+            continue; // 跳过其他项目的记录
+          }
+        }
+      }
+      
       if (item.type === 'entity') {
         entities.push(item);
       } else if (item.type === 'relation') {
@@ -80,6 +104,8 @@ async function searchKnowledgeGraph(userInput, config) {
   }
 
   log(`\n📊 [知识图谱加载]`);
+  log(`   当前项目: ${currentProject || 'unknown'}`);
+  log(`   项目隔离: ${config.project_isolation}`);
   log(`   实体数量: ${entities.length}`);
   log(`   关系数量: ${relations.length}`);
 

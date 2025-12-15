@@ -12,6 +12,18 @@ const MEMORY_FILE = path.join(DATA_DIR, 'mem.jsonl');
 const SESSION_FILE = path.join(DATA_DIR, 'current_session.json');
 const HEARTBEAT_FILE = path.join(DATA_DIR, 'heartbeat.txt');
 
+/**
+ * 获取当前项目名称
+ */
+function getProjectName() {
+  try {
+    const projectPath = process.env.CLAUDE_WORKSPACE_PATH || process.cwd();
+    return path.basename(projectPath);
+  } catch (error) {
+    return null;
+  }
+}
+
 // 更新心跳
 try {
   fs.writeFileSync(HEARTBEAT_FILE, Date.now().toString(), 'utf8');
@@ -35,6 +47,7 @@ process.stdin.on('end', () => {
       const record = {
         id: randomUUID(),
         type: 'user_message',
+        project: getProjectName(),
         content: userInput,
         timestamp: new Date().toISOString(),
       };

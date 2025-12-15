@@ -23,6 +23,7 @@ function extractEntitiesFromSummary(summary) {
     type: 'entity',
     name: `会话_${summary.id.substring(0, 8)}`,
     entityType: '会话',
+    project: summary.project || null,
     observations: [
       `调查: ${summary.investigated || ''}`,
       `学习: ${summary.learned || ''}`,
@@ -47,6 +48,7 @@ function extractEntitiesFromSummary(summary) {
       type: 'entity',
       name: keyword,
       entityType: '概念',
+      project: summary.project || null,
       observations: [`在会话中提及: ${summary.timestamp}`],
       timestamp: summary.timestamp
     };
@@ -58,7 +60,8 @@ function extractEntitiesFromSummary(summary) {
       type: 'relation',
       from: sessionEntity.name,
       to: keyword,
-      relationType: '涉及'
+      relationType: '涉及',
+      project: summary.project || null
     });
   }
 
@@ -77,6 +80,7 @@ function extractEntitiesFromObservation(observation) {
     type: 'entity',
     name: observation.title || `观察_${observation.id.substring(0, 8)}`,
     entityType: observation.obs_type || 'discovery',
+    project: observation.project || null,
     observations: [
       `洞察: ${observation.insight || ''}`,
       `概念: ${(observation.concepts || []).join(', ')}`,
@@ -95,6 +99,7 @@ function extractEntitiesFromObservation(observation) {
         type: 'entity',
         name: file,
         entityType: '文件',
+        project: observation.project || null,
         observations: [`${observation.obs_type}操作: ${observation.timestamp}`],
         timestamp: observation.timestamp
       });
@@ -103,7 +108,8 @@ function extractEntitiesFromObservation(observation) {
         type: 'relation',
         from: obsEntity.name,
         to: file,
-        relationType: '涉及文件'
+        relationType: '涉及文件',
+        project: observation.project || null
       });
     }
   }

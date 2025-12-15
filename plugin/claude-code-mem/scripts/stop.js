@@ -16,6 +16,18 @@ const DEBUG_FILE = path.join(DATA_DIR, 'stop_debug.log');
 const WORKER_PORT = process.env.CLAUDE_MEM_WORKER_PORT || 37777;
 const WORKER_HOST = process.env.CLAUDE_MEM_WORKER_HOST || '127.0.0.1';
 
+/**
+ * 获取当前项目名称
+ */
+function getProjectName() {
+  try {
+    const projectPath = process.env.CLAUDE_WORKSPACE_PATH || process.cwd();
+    return path.basename(projectPath);
+  } catch (error) {
+    return null;
+  }
+}
+
 // 确保目录存在
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -61,6 +73,7 @@ if (assistantResponse) {
     const record = {
       id: randomUUID(),
       type: 'assistant_message',
+      project: getProjectName(),
       content: assistantResponse,
       timestamp: new Date().toISOString(),
     };
@@ -68,6 +81,7 @@ if (assistantResponse) {
     fs.appendFileSync(MEMORY_FILE, JSON.stringify(record) + '\n', 'utf8');
     debugLog('Recorded assistant response', {
       id: record.id,
+      project: record.project,
       length: assistantResponse.length,
     });
 
@@ -203,10 +217,14 @@ function analyzeLocally(sessionData) {
           observation_count: analysis.observations?.length || 0,
         });
 
+        // 获取项目名称
+        const projectName = getProjectName();
+
         // 记录总结
         const summaryRecord = {
           id: randomUUID(),
           type: 'session_summary',
+          project: projectName,
           format: 'structured',
           investigated: analysis.investigated || '',
           learned: analysis.learned || '',
@@ -218,7 +236,7 @@ function analyzeLocally(sessionData) {
         };
 
         fs.appendFileSync(MEMORY_FILE, JSON.stringify(summaryRecord) + '\n', 'utf8');
-        debugLog('Saved summary to file', { id: summaryRecord.id });
+        debugLog('Saved summary to file', { id: summaryRecord.id, project: projectName });
 
         // 记录观察
         if (analysis.observations && analysis.observations.length > 0) {
@@ -226,6 +244,7 @@ function analyzeLocally(sessionData) {
             const obsRecord = {
               id: randomUUID(),
               type: 'observation',
+              project: projectName,
               obs_type: obs.type,
               title: obs.title,
               insight: obs.insight,
