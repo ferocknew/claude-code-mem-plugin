@@ -12,7 +12,7 @@ const MEMORY_FILE = path.join(DATA_DIR, 'mem.jsonl');
 const SESSION_FILE = path.join(DATA_DIR, 'current_session.json');
 const HEARTBEAT_FILE = path.join(DATA_DIR, 'heartbeat.txt');
 
-const PORT = process.env.CLAUDE_MEM_WORKER_PORT || 37777;
+const PORT = process.env.CLAUDE_MEM_WORKER_PORT || 57777;
 const HOST = process.env.CLAUDE_MEM_WORKER_HOST || '127.0.0.1';
 
 // 确保目录存在

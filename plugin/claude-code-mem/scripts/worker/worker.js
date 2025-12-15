@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Worker 服务 - 后台分析服务
- * 监听端口 37777，接收会话数据并异步分析
+ * 监听端口 57777，接收会话数据并异步分析
  */
 const http = require('http');
 const fs = require('fs');
@@ -10,7 +10,7 @@ const os = require('os');
 const { randomUUID } = require('crypto');
 const { analyzeSession } = require('../llm_analyzer');
 
-const PORT = process.env.CLAUDE_MEM_WORKER_PORT || 37777;
+const PORT = process.env.CLAUDE_MEM_WORKER_PORT || 57777;
 const HOST = process.env.CLAUDE_MEM_WORKER_HOST || '127.0.0.1';
 const DATA_DIR = path.join(os.homedir(), '.claude-code-mem');
 const MEMORY_FILE = path.join(DATA_DIR, 'mem.jsonl');

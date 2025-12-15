@@ -13,7 +13,7 @@ const MEMORY_FILE = path.join(DATA_DIR, 'mem.jsonl');
 const SESSION_FILE = path.join(DATA_DIR, 'current_session.json');
 const DEBUG_FILE = path.join(DATA_DIR, 'stop_debug.log');
 
-const WORKER_PORT = process.env.CLAUDE_MEM_WORKER_PORT || 37777;
+const WORKER_PORT = process.env.CLAUDE_MEM_WORKER_PORT || 57777;
 const WORKER_HOST = process.env.CLAUDE_MEM_WORKER_HOST || '127.0.0.1';
 
 /**

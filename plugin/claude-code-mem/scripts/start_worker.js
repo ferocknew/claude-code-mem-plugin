@@ -15,7 +15,7 @@ const PID_FILE = path.join(DATA_DIR, 'worker.pid');
 const LOG_FILE = path.join(DATA_DIR, 'worker.log');
 const WORKER_SCRIPT = path.join(__dirname, 'worker', 'worker.js');
 
-const PORT = process.env.CLAUDE_MEM_WORKER_PORT || 37777;
+const PORT = process.env.CLAUDE_MEM_WORKER_PORT || 57777;
 const HOST = process.env.CLAUDE_MEM_WORKER_HOST || '127.0.0.1';
 
 /**
