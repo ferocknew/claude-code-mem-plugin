@@ -36,18 +36,7 @@
         ]
       }
     ],
-    "PostToolUse": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/post_tool.js\"",
-            "timeout": 10
-          }
-        ]
-      }
-    ],
+
     "Stop": [
       {
         "hooks": [

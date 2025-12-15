@@ -8,7 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { randomUUID } = require('crypto');
-const { analyzeSession } = require('./llm_analyzer');
+const { analyzeSession } = require('../llm_analyzer');
 
 const PORT = process.env.CLAUDE_MEM_WORKER_PORT || 37777;
 const HOST = process.env.CLAUDE_MEM_WORKER_HOST || '127.0.0.1';
@@ -287,7 +287,7 @@ const server = http.createServer((req, res) => {
 
   // 静态文件服务（UI页面）
   if (req.method === 'GET' && (req.url === '/' || req.url === '/index.html')) {
-    const indexPath = path.join(__dirname, '..', 'ui', 'index.html');
+    const indexPath = path.join(__dirname, 'ui', 'index.html');
     if (fs.existsSync(indexPath)) {
       const content = fs.readFileSync(indexPath, 'utf8');
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });

@@ -27,19 +27,8 @@ try {
   // 忽略心跳更新错误
 }
 
-// 记录会话开始
-const record = {
-  type: 'session_event',
-  event: 'session_start',
-  timestamp: new Date().toISOString(),
-};
-
-fs.appendFileSync(MEMORY_FILE, JSON.stringify(record) + '\n', 'utf8');
-console.error(`✅ Session started at ${record.timestamp}`);
-
 // 初始化当前会话文件（用于收集会话数据）
 fs.writeFileSync(SESSION_FILE, JSON.stringify([]), 'utf8');
-console.error(`✅ Initialized session data file`);
 
 /**
  * 检查 Worker 状态并显示开场通知
