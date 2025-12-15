@@ -12,7 +12,7 @@
           },
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/session-start.js\"",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/session_start.js\"",
             "timeout": 30,
             "description": "Record session start"
           }
@@ -30,7 +30,7 @@
           },
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/user-prompt.js\"",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/user_prompt.js\"",
             "timeout": 10
           }
         ]
@@ -42,7 +42,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/post-tool.js\"",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/post_tool.js\"",
             "timeout": 10
           }
         ]

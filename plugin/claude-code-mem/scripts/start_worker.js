@@ -13,7 +13,7 @@ const http = require('http');
 const DATA_DIR = path.join(os.homedir(), '.claude-code-mem');
 const PID_FILE = path.join(DATA_DIR, 'worker.pid');
 const LOG_FILE = path.join(DATA_DIR, 'worker.log');
-const WORKER_SCRIPT = path.join(__dirname, 'worker.js');
+const WORKER_SCRIPT = path.join(__dirname, 'worker', 'worker.js');
 
 const PORT = process.env.CLAUDE_MEM_WORKER_PORT || 37777;
 const HOST = process.env.CLAUDE_MEM_WORKER_HOST || '127.0.0.1';

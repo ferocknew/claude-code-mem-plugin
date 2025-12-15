@@ -301,7 +301,7 @@ const server = http.createServer((req, res) => {
 
   // 提供静态资源（CSS, JS 等）
   if (req.method === 'GET' && (req.url.startsWith('/ui/') || req.url.startsWith('/static/'))) {
-    const resourcePath = path.join(__dirname, '..', req.url);
+    const resourcePath = path.join(__dirname, req.url);
     if (fs.existsSync(resourcePath)) {
       const ext = path.extname(resourcePath);
       const contentType = {
