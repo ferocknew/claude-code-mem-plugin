@@ -4,6 +4,7 @@
  * 提取观察(observations)和生成总结
  */
 const https = require('https');
+const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
@@ -70,9 +71,7 @@ function getApiConfig() {
   // 优先使用 Claude Code 提供的认证 Token
   const authToken = process.env.ANTHROPIC_AUTH_TOKEN;
   const baseUrl = process.env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com';
-
-  // 获取默认模型配置
-  const defaultModel = process.env.ANTHROPIC_DEFAULT_HAIKU_MODEL || 'glm-4.5-air';
+  const defaultModel = process.env.ANTHROPIC_DEFAULT_HAIKU_MODEL || 'claude-3-5-haiku-20241022';
 
   // 如果有 auth token，优先使用
   if (authToken) {
@@ -81,18 +80,20 @@ function getApiConfig() {
       apiKey: authToken,
       baseUrl: baseUrl,
       model: defaultModel,
-      source: 'claude_code' // 标记来源
+      source: 'claude_code'
     };
   }
 
   // 回退到用户配置的 API Key
   const apiKey = process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY;
   if (apiKey) {
-    log('API config found', { source: 'user_config', model: 'claude-haiku-4' });
+    // 用户配置也使用环境变量中的模型，如果没有则使用默认值
+    const userModel = process.env.ANTHROPIC_DEFAULT_HAIKU_MODEL || 'claude-3-5-haiku-20241022';
+    log('API config found', { source: 'user_config', model: userModel, baseUrl });
     return {
       apiKey: apiKey,
-      baseUrl: 'https://api.anthropic.com',
-      model: 'claude-haiku-4',
+      baseUrl: baseUrl,
+      model: userModel,
       source: 'user_config'
     };
   }
@@ -127,35 +128,72 @@ async function callClaudeAPI(prompt, config) {
       ],
     });
 
-    // 解析 base URL
-    const url = new URL(config.baseUrl + '/v1/messages');
+    // 解析 base URL - 确保不重复添加路径
+    let apiUrl;
+    try {
+      // 如果 baseUrl 已经包含完整路径，直接使用
+      if (config.baseUrl.includes('/v1/messages')) {
+        apiUrl = new URL(config.baseUrl);
+      } else {
+        // 否则添加 /v1/messages 路径
+        const baseUrlClean = config.baseUrl.replace(/\/$/, ''); // 移除末尾斜杠
+        apiUrl = new URL(baseUrlClean + '/v1/messages');
+      }
+    } catch (error) {
+      log('Invalid base URL', { baseUrl: config.baseUrl, error: error.message });
+      throw new Error(`Invalid base URL: ${config.baseUrl}`);
+    }
 
-    // 根据不同的 API 提供商设置不同的请求头
+    // 设置请求头
     const headers = {
       'Content-Type': 'application/json',
-      'Content-Length': Buffer.byteLength(data), // 使用 Buffer.byteLength 确保准确
+      'Content-Length': Buffer.byteLength(data),
     };
 
-    // 智谱 AI 使用 Authorization header (遵循 Anthropic API 规范)
-    if (config.baseUrl.includes('bigmodel.cn')) {
+    // 根据环境变量决定使用哪种认证方式
+    // 如果设置了 ANTHROPIC_USE_BEARER_AUTH=true，使用 Bearer token
+    // 否则使用 x-api-key (Anthropic 官方格式)
+    const useBearerAuth = process.env.ANTHROPIC_USE_BEARER_AUTH === 'true';
+    
+    if (useBearerAuth) {
       headers['Authorization'] = `Bearer ${config.apiKey}`;
     } else {
-      // Anthropic 官方 API 使用 x-api-key
       headers['x-api-key'] = config.apiKey;
       headers['anthropic-version'] = '2023-06-01';
     }
 
+    // SSL 证书验证控制
+    // 如果设置了 ANTHROPIC_SKIP_SSL_VERIFY=true，跳过证书验证
+    const skipSslVerify = process.env.ANTHROPIC_SKIP_SSL_VERIFY === 'true';
+
+    // 根据协议选择 http 或 https 模块
+    const isHttps = apiUrl.protocol === 'https:';
+    const httpModule = isHttps ? https : http;
+    
+    log('Request details', {
+      url: apiUrl.href,
+      protocol: apiUrl.protocol,
+      hostname: apiUrl.hostname,
+      path: apiUrl.pathname,
+      useBearerAuth,
+      skipSslVerify: isHttps ? skipSslVerify : 'N/A (HTTP)',
+      headers: { ...headers, Authorization: headers.Authorization ? '***' : undefined, 'x-api-key': headers['x-api-key'] ? '***' : undefined }
+    });
+
     const options = {
-      hostname: url.hostname,
-      port: url.port || 443,
-      path: url.pathname,
+      hostname: apiUrl.hostname,
+      port: apiUrl.port || (isHttps ? 443 : 80),
+      path: apiUrl.pathname + apiUrl.search,
       method: 'POST',
       headers: headers,
-      // 对于智谱 AI,需要禁用严格的证书验证
-      rejectUnauthorized: !config.baseUrl.includes('bigmodel.cn'),
     };
+    
+    // 只有 HTTPS 才需要设置 SSL 验证选项
+    if (isHttps) {
+      options.rejectUnauthorized = !skipSslVerify;
+    }
 
-    const req = https.request(options, (res) => {
+    const req = httpModule.request(options, (res) => {
       let responseData = '';
 
       res.on('data', (chunk) => {
@@ -163,20 +201,30 @@ async function callClaudeAPI(prompt, config) {
       });
 
       res.on('end', () => {
+        log('API response received', { 
+          statusCode: res.statusCode, 
+          contentType: res.headers['content-type'],
+          dataLength: responseData.length 
+        });
+
         if (res.statusCode >= 200 && res.statusCode < 300) {
           try {
             const parsed = JSON.parse(responseData);
+            log('API response parsed successfully');
             resolve(parsed);
           } catch (error) {
+            log('Failed to parse API response', { error: error.message, response: responseData.substring(0, 200) });
             reject(new Error(`Failed to parse API response: ${error.message}`));
           }
         } else {
+          log('API request failed', { statusCode: res.statusCode, response: responseData.substring(0, 500) });
           reject(new Error(`API request failed with status ${res.statusCode}: ${responseData}`));
         }
       });
     });
 
     req.on('error', (error) => {
+      log('API request error', { error: error.message, code: error.code, stack: error.stack });
       reject(new Error(`API request error: ${error.message}`));
     });
 

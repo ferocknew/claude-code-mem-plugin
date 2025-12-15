@@ -147,23 +147,54 @@ git clone https://github.com/ferocknew/claude-code-mem-plugin.git
 - ✅ 支持自定义 API 端点（如智谱 AI）
 - ✅ 零配置，开箱即用
 
-#### 手动配置（可选）
+#### API 配置（可选）
 
-如果需要使用自己的 API Key：
+插件支持使用 Claude API 进行智能内容分析。配置方式：
+
+**1. 使用 Anthropic 官方 API**
 
 ```bash
-# 设置环境变量
+# 设置 API Key
 export ANTHROPIC_API_KEY="sk-ant-xxxxx"
 
-# 或者使用别名
+# 或使用别名
 export CLAUDE_API_KEY="your-api-key-here"
 ```
 
-**获取 API Key:**
-1. 访问 [Anthropic Console](https://console.anthropic.com/)
-2. 登录或注册账号
-3. 在 API Keys 页面创建新的 API Key
-4. 将 Key 添加到环境变量中
+获取 API Key：访问 [Anthropic Console](https://console.anthropic.com/) → API Keys
+
+**2. 使用第三方 API（如智谱 AI）**
+
+```bash
+# API Key
+export ANTHROPIC_API_KEY="your-api-key"
+
+# API 端点
+export ANTHROPIC_BASE_URL="https://open.bigmodel.cn/api/paas/v4"
+
+# 模型名称
+export ANTHROPIC_DEFAULT_HAIKU_MODEL="glm-4-flash"
+
+# 使用 Bearer Token 认证（第三方 API 通常需要）
+export ANTHROPIC_USE_BEARER_AUTH="true"
+
+# 如果遇到 SSL 证书问题（仅用于测试）
+export ANTHROPIC_SKIP_SSL_VERIFY="true"
+```
+
+**3. 诊断工具**
+
+如果遇到 API 连接问题，运行诊断工具：
+
+```bash
+node plugin/claude-code-mem/scripts/diagnose_api.js
+```
+
+诊断工具会检查：
+- 环境变量配置
+- API 连接状态
+- 认证方式
+- SSL 证书问题
 
 **分析功能说明:**
 - 当设置了 API Key 时，插件会在会话结束时自动分析对话内容
@@ -172,6 +203,7 @@ export CLAUDE_API_KEY="your-api-key-here"
 - 🔍 **智能提取**: 自动识别技术观察（bugfix、feature、refactor等）
 - 💰 **节省成本**: 每次会话只调用 1 次 API（之前是 2 次）
 - 🛡️ **优雅降级**: 如果未设置 API Key，插件仍会正常工作，只是不会生成分析内容
+- 🌐 **多 API 支持**: 支持 Anthropic 官方 API 和兼容的第三方 API
 
 ---
 

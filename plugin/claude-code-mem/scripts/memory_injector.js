@@ -7,6 +7,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const https = require('https');
+const http = require('http');
 
 const DATA_DIR = path.join(os.homedir(), '.claude-code-mem');
 const GRAPH_FILE = path.join(DATA_DIR, 'knowledge_graph.jsonl');
@@ -240,7 +241,7 @@ async function searchKnowledgeGraph(userInput, config) {
 function getApiConfig() {
   const authToken = process.env.ANTHROPIC_AUTH_TOKEN;
   const baseUrl = process.env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com';
-  const defaultModel = process.env.ANTHROPIC_DEFAULT_HAIKU_MODEL || 'glm-4.5-air';
+  const defaultModel = process.env.ANTHROPIC_DEFAULT_HAIKU_MODEL || 'claude-3-5-haiku-20241022';
 
   if (authToken) {
     return {
@@ -255,8 +256,8 @@ function getApiConfig() {
   if (apiKey) {
     return {
       apiKey: apiKey,
-      baseUrl: 'https://api.anthropic.com',
-      model: 'claude-haiku-4',
+      baseUrl: baseUrl,
+      model: defaultModel,
       source: 'user_config'
     };
   }
@@ -284,30 +285,57 @@ async function callClaudeAPI(prompt, config, timeout = 5000) {
       ],
     });
 
-    const url = new URL(config.baseUrl + '/v1/messages');
+    // 解析 base URL - 确保不重复添加路径
+    let apiUrl;
+    try {
+      if (config.baseUrl.includes('/v1/messages')) {
+        apiUrl = new URL(config.baseUrl);
+      } else {
+        const baseUrlClean = config.baseUrl.replace(/\/$/, '');
+        apiUrl = new URL(baseUrlClean + '/v1/messages');
+      }
+    } catch (error) {
+      clearTimeout(timer);
+      reject(new Error(`Invalid base URL: ${config.baseUrl}`));
+      return;
+    }
 
     const headers = {
       'Content-Type': 'application/json',
       'Content-Length': Buffer.byteLength(data),
     };
 
-    if (config.baseUrl.includes('bigmodel.cn')) {
+    // 根据环境变量决定认证方式
+    const useBearerAuth = process.env.ANTHROPIC_USE_BEARER_AUTH === 'true';
+    
+    if (useBearerAuth) {
       headers['Authorization'] = `Bearer ${config.apiKey}`;
     } else {
       headers['x-api-key'] = config.apiKey;
       headers['anthropic-version'] = '2023-06-01';
     }
 
+    // SSL 证书验证控制
+    const skipSslVerify = process.env.ANTHROPIC_SKIP_SSL_VERIFY === 'true';
+
+    // 根据协议选择 http 或 https 模块
+    const isHttps = apiUrl.protocol === 'https:';
+    const httpModule = isHttps ? https : http;
+
     const options = {
-      hostname: url.hostname,
-      port: url.port || 443,
-      path: url.pathname,
+      hostname: apiUrl.hostname,
+      port: apiUrl.port || (isHttps ? 443 : 80),
+      path: apiUrl.pathname + apiUrl.search,
       method: 'POST',
       headers: headers,
-      rejectUnauthorized: !config.baseUrl.includes('bigmodel.cn'),
     };
+    
+    // 只有 HTTPS 才需要设置 SSL 验证选项
+    if (isHttps) {
+      options.rejectUnauthorized = !skipSslVerify;
+    }
 
-    const req = https.request(options, (res) => {
+    const req = httpModule.request(options, (res) => {
       let responseData = '';
 
       res.on('data', (chunk) => {
