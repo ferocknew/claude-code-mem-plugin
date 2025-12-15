@@ -1,7 +1,8 @@
 # Claude Code Memory Plugin
 
 纯 JavaScript 的 Claude Code 记忆插件，通过 hooks 自动记录对话内容到本地 JSONL 文件。
-
+- 需要使用 bun (1.3.4) 
+- macos 安装： `brew install oven-sh/bun/bun`, windows 安装: `powershell -c "irm bun.sh/install.ps1|iex"`
 ---
 
 ## 🚀 快速安装

@@ -42,7 +42,7 @@ fs.writeFileSync(SESSION_FILE, JSON.stringify([]), 'utf8');
 console.error(`✅ Initialized session data file`);
 
 /**
- * 检查 Worker 状态
+ * 检查 Worker 状态并显示开场通知
  */
 function checkWorkerStatus() {
   const req = http.get(`http://${HOST}:${PORT}/health`, (res) => {
@@ -56,35 +56,92 @@ function checkWorkerStatus() {
       if (res.statusCode === 200) {
         try {
           const health = JSON.parse(data);
-          console.error('');
-          console.error('='.repeat(60));
-          console.error('🧠 Claude Code Memory Plugin');
-          console.error('='.repeat(60));
-          console.error(`✅ Worker 运行中 (运行时间: ${Math.floor(health.uptime)}秒)`);
-          console.error(`🌐 Web UI: http://${HOST}:${PORT}/`);
-          console.error(`📊 当前统计: ${health.stats?.total_records || 0} 条记录`);
-          console.error('='.repeat(60));
-          console.error('');
+          // Worker 运行正常，显示成功通知
+          console.error(`
+---
+🎉  Note: This appears under Plugin Hook Error, but it's not an error. That's the only option for
+    user messages in Claude Code UI until a better method is provided.
+---
+
+🧠 Claude Code Memory Plugin - 已加载
+
+✅ Worker 运行中 (运行时间: ${Math.floor(health.uptime)}秒)
+📊 当前统计: ${health.stats?.total_records || 0} 条记录
+🌐 Web UI: http://${HOST}:${PORT}/
+
+💡 功能特性:
+   • 自动记录对话内容到本地 JSONL 文件
+   • 智能内容分析和会话总结
+   • 技术观察提取 (bugfix, feature, refactor 等)
+   • 知识图谱构建
+   • 记忆注入功能
+
+📝 数据存储: ~/.claude-code-mem/mem.jsonl
+
+💬 GitHub: https://github.com/ferocknew/claude-code-mem-plugin
+
+---
+This message was not added to your startup context, so you can continue working as normal.
+          `);
+          process.exit(3); // 退出码 3：只显示用户消息，不注入上下文
         } catch (error) {
-          // 忽略解析错误
+          // 解析错误，显示警告
+          showFirstTimeSetup();
         }
       } else {
-        console.error(`⚠️  Worker 响应异常 (状态码: ${res.statusCode})`);
+        // Worker 响应异常
+        showFirstTimeSetup();
       }
     });
   });
 
   req.on('error', () => {
-    console.error('');
-    console.error('⚠️  Memory Worker 未启动');
-    console.error(`   可通过以下命令启动: node ${path.join(__dirname, 'start_worker.js')}`);
-    console.error('');
+    // Worker 未启动，显示首次安装通知
+    showFirstTimeSetup();
   });
 
   req.setTimeout(1000, () => {
     req.destroy();
+    showFirstTimeSetup();
   });
 }
 
-// 检查 Worker 状态并显示 Web UI 访问信息
+/**
+ * 显示首次安装/Worker 未启动通知
+ */
+function showFirstTimeSetup() {
+  console.error(`
+---
+🎉  Note: This appears under Plugin Hook Error, but it's not an error. That's the only option for
+    user messages in Claude Code UI until a better method is provided.
+---
+
+⚠️  Claude Code Memory Plugin - 首次设置
+
+Memory Worker 未启动或正在初始化中...
+
+💡 启动 Worker 服务:
+   node ${path.join(__dirname, 'start_worker.js')}
+
+📝 功能说明:
+   • 自动记录对话内容到本地 JSONL 文件
+   • 智能内容分析和会话总结
+   • 技术观察提取和知识图谱构建
+   • 记忆注入功能
+
+📂 数据存储位置: ~/.claude-code-mem/mem.jsonl
+🌐 Web UI 端口: ${PORT}
+
+💬 GitHub: https://github.com/ferocknew/claude-code-mem-plugin
+📖 文档: 查看 README.md 了解更多
+
+感谢安装 Claude Code Memory Plugin！
+
+---
+This message was not added to your startup context, so you can continue working as normal.
+  `);
+  process.exit(3); // 退出码 3：只显示用户消息，不注入上下文
+}
+
+// 检查 Worker 状态并显示开场通知
 checkWorkerStatus();
